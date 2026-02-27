@@ -25,47 +25,46 @@ export default function GamePage() {
 
   return (
     // Full-screen container — Phaser fills this, React UI floats on top
-    <div className="relative w-screen h-screen bg-[#0d1117] overflow-hidden">
-
+    <div className="relative h-full w-full overflow-hidden bg-[#0d1117]">
       {/* ── Phaser Canvas ─────────────────────────────────────── */}
       <div className="absolute inset-0">
         <PhaserGame onPositionChange={handlePositionChange} sceneRef={sceneRef} />
       </div>
 
       {/* ── Top Bar HUD ────────────────────────────────────────── */}
-      <header className="absolute top-0 inset-x-0 flex items-center justify-between px-4 py-2 pointer-events-none">
-        <div className="flex items-center gap-2 pointer-events-auto">
-          <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="text-xs font-mono text-white/70">Clawd Cartel HQ</span>
+      <header className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between px-4 py-2">
+        <div className="pointer-events-auto flex items-center gap-2">
+          <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
+          <span className="font-mono text-xs text-white/70">Clawd Cartel HQ</span>
         </div>
 
-        <div className="text-xs font-mono text-white/40">
+        <div className="font-mono text-xs text-white/40">
           {coords.x}, {coords.y}
         </div>
 
-        <div className="flex items-center gap-2 pointer-events-auto">
-          <span className="text-xs font-mono text-white/50 bg-white/10 px-2 py-1 rounded">
+        <div className="pointer-events-auto flex items-center gap-2">
+          <span className="rounded bg-white/10 px-2 py-1 font-mono text-xs text-white/50">
             1 online
           </span>
         </div>
       </header>
 
       {/* ── Controls Legend ────────────────────────────────────── */}
-      <div className="absolute bottom-4 left-4 text-xs font-mono text-white/40 space-y-0.5 pointer-events-none">
+      <div className="pointer-events-none absolute bottom-4 left-4 space-y-0.5 font-mono text-xs text-white/40">
         <p>Move — WASD / Arrow keys</p>
-        <p className="text-white/20 text-[10px]">Phase 3: multiplayer via Socket.io</p>
-        <p className="text-white/20 text-[10px]">Phase 4: proximity video via WebRTC</p>
+        <p className="text-[10px] text-white/20">Phase 3: multiplayer via Socket.io</p>
+        <p className="text-[10px] text-white/20">Phase 4: proximity video via WebRTC</p>
       </div>
 
       {/* ── Online Players Panel (Phase 3 placeholder) ─────────── */}
-      <div className="absolute bottom-4 right-4 bg-black/40 border border-white/10 rounded-lg p-3 text-xs font-mono text-white/60 w-44 pointer-events-auto">
-        <p className="text-white/80 mb-2 font-semibold">Online</p>
+      <div className="pointer-events-auto absolute right-4 bottom-4 w-44 rounded-lg border border-white/10 bg-black/40 p-3 font-mono text-xs text-white/60">
+        <p className="mb-2 font-semibold text-white/80">Online</p>
         <div className="flex items-center gap-2">
-          <div className="w-5 h-5 rounded-full bg-indigo-500 flex-shrink-0" />
+          <div className="h-5 w-5 flex-shrink-0 rounded-full bg-indigo-500" />
           <span>You</span>
           <span className="ml-auto text-emerald-400">●</span>
         </div>
-        <p className="mt-2 text-white/20 text-[10px]">Other players appear here in Phase 3</p>
+        <p className="mt-2 text-[10px] text-white/20">Other players appear here in Phase 3</p>
       </div>
     </div>
   );
@@ -73,9 +72,9 @@ export default function GamePage() {
 
 function GameLoadingScreen() {
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center bg-[#0d1117] gap-3">
-      <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-      <p className="text-sm font-mono text-white/40">Loading world...</p>
+    <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-[#0d1117]">
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
+      <p className="font-mono text-sm text-white/40">Loading world...</p>
     </div>
   );
 }
