@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import type Phaser from "phaser";
-import type { GameScene } from "./scenes/GameScene";
+import type { GameScene } from "../../_libs/game/GameScene";
 
 type Props = {
   /** Called every time the local player moves — wire to socket in Phase 3 */
@@ -16,28 +16,34 @@ export function PhaserGame({ onPositionChange, sceneRef }: Props) {
   const gameRef = useRef<Phaser.Game | null>(null);
 
   useEffect(() => {
-    // Phaser touches window/document so it CANNOT run on the server.
-    // This useEffect only fires in the browser, so we're safe.
-    let game: Phaser.Game;
+    // Track whether the cleanup already ran so we can cancel a pending async init.
+    // This fixes React 18 StrictMode double-mount: StrictMode unmounts and remounts
+    // every component once in development. Because initPhaser is async, the cleanup
+    // fires BEFORE the first init resolves — without this flag, the async continues,
+    // creates a Phaser game, and a second mount creates another one on top.
+    let cancelled = false;
+
+    // Keep a local reference so cleanup can destroy the game even if the async
+    // finishes AFTER the cleanup runs (gameRef.current would still be null then).
+    let localGame: Phaser.Game | null = null;
 
     async function initPhaser() {
-      // Dynamic import keeps Phaser out of the server bundle entirely
       const Phaser = (await import("phaser")).default;
-      const { PreloadScene } = await import("./scenes/PreloadScene");
-      const { GameScene } = await import("./scenes/GameScene");
+      const { PreloadScene } = await import("../../_libs/game/PreloadScene");
+      const { GameScene } = await import("../../_libs/game/GameScene");
 
-      if (!containerRef.current) return;
+      // Cleanup ran while we were awaiting — abort, don't create the game.
+      if (cancelled || !containerRef.current) return;
+
+      // Guard: never create a second instance if one is already running.
+      if (gameRef.current) return;
 
       const gameScene = new GameScene();
-
-      // Wire the position callback from React into the Phaser scene
       gameScene.onPositionChange = onPositionChange;
-
-      // Expose scene instance to parent via ref
       if (sceneRef) sceneRef.current = gameScene;
 
-      game = new Phaser.Game({
-        type: Phaser.AUTO,           // WebGL if available, else Canvas
+      const game = new Phaser.Game({
+        type: Phaser.AUTO,
         parent: containerRef.current,
         width: "100%",
         height: "100%",
@@ -45,41 +51,45 @@ export function PhaserGame({ onPositionChange, sceneRef }: Props) {
         scene: [PreloadScene, gameScene],
         physics: {
           default: "arcade",
-          arcade: {
-            gravity: { x: 0, y: 0 }, // top-down, no gravity
-            debug: false,             // set true to see hitboxes while developing
-          },
+          arcade: { gravity: { x: 0, y: 0 }, debug: false },
         },
         scale: {
-          mode: Phaser.Scale.RESIZE, // canvas resizes with the container
+          mode: Phaser.Scale.RESIZE,
           autoCenter: Phaser.Scale.CENTER_BOTH,
         },
-        // Prevent Phaser from stealing keyboard focus from React inputs
         input: {
           keyboard: { capture: [] },
         },
       });
 
+      localGame     = game;
       gameRef.current = game;
     }
 
     initPhaser();
 
     return () => {
-      // Clean up Phaser when the React component unmounts
-      gameRef.current?.destroy(true);
+      cancelled = true;
+
+      // Destroy whichever reference exists — localGame handles the race where
+      // the async resolved but gameRef.current wasn't set yet at cleanup time.
+      const instance = localGame ?? gameRef.current;
+      instance?.destroy(true);
+
+      localGame       = null;
       gameRef.current = null;
       if (sceneRef) sceneRef.current = null;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
     <div
       ref={containerRef}
-      className="w-full h-full"
-      // Prevent the browser context menu from showing over the game canvas
+      className="h-full w-full"
       onContextMenu={(e) => e.preventDefault()}
+      // Blur any focused input/textarea when the user clicks back into the game
+      onPointerDown={() => (document.activeElement as HTMLElement)?.blur()}
     />
   );
 }

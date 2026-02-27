@@ -1,7 +1,7 @@
 "use client";
 
 import { ChatPanel, DUMMY_CHAT_MESSAGES } from "@/app/_components/chats/ChatPanel";
-import type { GameScene } from "@/app/_components/game/scenes/GameScene";
+import type { GameScene } from "@/app/_libs/game/GameScene";
 import { IdeLayout } from "@/app/_components/IdeLayout";
 import { PixelatedLoadingScreen } from "@/app/_components/ui/PixelatedLoadingScreen";
 import dynamic from "next/dynamic";
@@ -38,7 +38,6 @@ export default function IdeLayoutPage() {
             />
           }
           right={<Builder />}
-          
           centerClassName="p-6"
         >
           <div className="absolute inset-0">

@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Tiled map editor exports .tsx files that are XML, not TypeScript
+    "public/assets/*.tsx",
   ]),
 ]);
 

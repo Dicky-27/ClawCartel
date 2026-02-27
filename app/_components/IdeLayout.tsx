@@ -132,7 +132,12 @@ export function IdeLayout({
               className={cn(
                 "absolute inset-0 h-full overflow-auto",
                 centerClassName,
-                mobileView !== "center" && "hidden",
+                // Use invisible+pointer-events-none instead of hidden (display:none).
+                // `hidden` shrinks the container to 0×0, which Phaser detects as a
+                // resize event and destroys the WebGL canvas → blank screen on return.
+                // `invisible` keeps full dimensions so Phaser stays alive, while
+                // `pointer-events-none` lets touches/clicks pass to the active panel.
+                mobileView !== "center" && "invisible max-lg:pointer-events-none",
               )}
               aria-hidden={mobileView !== "center"}
             >

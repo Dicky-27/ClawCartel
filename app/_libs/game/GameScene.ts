@@ -120,7 +120,9 @@ export class GameScene extends Phaser.Scene {
     const worldW = map.widthInPixels;
     const worldH = map.heightInPixels;
     this.physics.world.setBounds(0, 0, worldW, worldH);
-    this.cameras.main.setBounds(0, 0, worldW, worldH);
+    // Store world size for camera setup (camera bounds set in setupCamera)
+    this.registry.set("worldW", worldW);
+    this.registry.set("worldH", worldH);
   }
 
   // ─── Player animations ────────────────────────────────────────────────────────
@@ -139,8 +141,9 @@ export class GameScene extends Phaser.Scene {
   // ─── Player ──────────────────────────────────────────────────────────────────
 
   private createPlayer() {
-    const spawnX = 5 * TILE_SIZE + TILE_SIZE / 2;
-    const spawnY = 8 * TILE_SIZE + TILE_SIZE / 2;
+    // Spawn in the center of the open floor area (col 15, row 10)
+    const spawnX = 15 * TILE_SIZE + TILE_SIZE / 2;
+    const spawnY = 10 * TILE_SIZE + TILE_SIZE / 2;
 
     this.player = this.physics.add.sprite(spawnX, spawnY, "player");
     this.player.setScale(PLAYER_SCALE);
@@ -172,6 +175,19 @@ export class GameScene extends Phaser.Scene {
   // ─── Camera ──────────────────────────────────────────────────────────────────
 
   private setupCamera() {
+    const worldW: number = this.registry.get("worldW");
+    const worldH: number = this.registry.get("worldH");
+
+    // Expand camera bounds far beyond the world so the camera can center on
+    // the player regardless of where they stand — including map edges.
+    // Without this, Phaser clamps the view to (0,0) when the viewport is
+    // larger than the world, pushing the entire map into the top-left corner.
+    this.cameras.main.setBounds(
+      -worldW, -worldH,
+      worldW * 3, worldH * 3,
+    );
+
+    // Smooth lerp follow (0.1 = eases toward player, not instant snap)
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
     this.cameras.main.setZoom(1);
   }
@@ -179,17 +195,55 @@ export class GameScene extends Phaser.Scene {
   // ─── Input ───────────────────────────────────────────────────────────────────
 
   private setupInput() {
-    this.cursors = this.input.keyboard!.createCursorKeys();
+    const kb = this.input.keyboard!;
+    this.cursors = kb.createCursorKeys();
     this.wasd = {
-      up:    this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.W),
-      down:  this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.S),
-      left:  this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.A),
-      right: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D),
+      up:    kb.addKey(Phaser.Input.Keyboard.KeyCodes.W),
+      down:  kb.addKey(Phaser.Input.Keyboard.KeyCodes.S),
+      left:  kb.addKey(Phaser.Input.Keyboard.KeyCodes.A),
+      right: kb.addKey(Phaser.Input.Keyboard.KeyCodes.D),
     };
+
+    // Block ALL keyboard events from reaching Phaser when a form element is focused.
+    // We intercept at the capture phase (fires before Phaser's listeners) and call
+    // stopPropagation() so Phaser never sees the event — no per-key config needed.
+    const isFormElement = () => {
+      const el = document.activeElement;
+      if (!el) return false;
+      const tag = el.tagName;
+      return tag === "INPUT" || tag === "TEXTAREA" || (el as HTMLElement).isContentEditable;
+    };
+
+    const blockForPhaser = (e: KeyboardEvent) => {
+      if (isFormElement()) e.stopPropagation();
+    };
+
+    // true = capture phase, so we fire before Phaser's bubble-phase listeners
+    document.addEventListener("keydown", blockForPhaser, true);
+    document.addEventListener("keyup",   blockForPhaser, true);
+
+    // Stop the player when focus enters a form element
+    const onFocusIn = () => {
+      if (isFormElement()) {
+        const body = this.player?.body as Phaser.Physics.Arcade.Body | undefined;
+        body?.setVelocity(0, 0);
+        this.player?.stop();
+        this.player?.setFrame(PLAYER_ANIM[this.lastDir].start);
+      }
+    };
+    document.addEventListener("focusin", onFocusIn);
+
+    // Clean up when this scene shuts down
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      document.removeEventListener("keydown",  blockForPhaser, true);
+      document.removeEventListener("keyup",    blockForPhaser, true);
+      document.removeEventListener("focusin",  onFocusIn);
+    });
   }
 
   private handleMovement() {
-    const body  = this.player.body as Phaser.Physics.Arcade.Body;
+    const body = this.player.body as Phaser.Physics.Arcade.Body;
+
     const up    = this.cursors.up.isDown    || this.wasd.up.isDown;
     const down  = this.cursors.down.isDown  || this.wasd.down.isDown;
     const left  = this.cursors.left.isDown  || this.wasd.left.isDown;
