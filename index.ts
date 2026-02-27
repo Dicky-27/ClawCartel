@@ -32,9 +32,10 @@ const fastify = Fastify({
     await FastifyUtil.registerMultipart(fastify)
 
     await fastify.register(routes)
-    await fastify.ready()
 
     registerSocket(fastify)
+
+    await fastify.ready()
 
     const { host, port } = AppConfig.app
     await fastify.listen({ host, port })
