@@ -10,7 +10,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning className="h-full">
-      <body className="h-full min-h-screen">
+      <body className="h-full min-h-screen" suppressHydrationWarning>
         <Providers>
           <div className="flex h-full min-h-screen flex-col">
             <AppHeader />

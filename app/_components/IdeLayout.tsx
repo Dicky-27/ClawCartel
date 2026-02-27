@@ -51,9 +51,7 @@ export function IdeLayout({
   const hasRight = right != null;
   const isDesktop = useMediaQuery(MD_BREAKPOINT);
 
-  const [mobileView, setMobileView] = React.useState<MobileView>(
-    hasRight ? "builder" : hasLeft ? "chat" : "center",
-  );
+  const [mobileView, setMobileView] = React.useState<MobileView>("center");
   const [leftWidth, setLeftWidth] = React.useState(defaultLeftSize);
   const [rightWidth, setRightWidth] = React.useState(defaultRightWidth);
   const leftDragRef = React.useRef(false);

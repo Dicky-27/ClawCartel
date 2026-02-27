@@ -1,11 +1,24 @@
 "use client";
 
 import { ChatPanel, DUMMY_CHAT_MESSAGES } from "@/app/_components/chats/ChatPanel";
+import type { GameScene } from "@/app/_components/game/scenes/GameScene";
 import { IdeLayout } from "@/app/_components/IdeLayout";
-import { cn } from "@/app/_libs/utils";
+import dynamic from "next/dynamic";
+import { useCallback, useRef, useState } from "react";
 import Builder from "../_components/builders/Builder";
+const PhaserGame = dynamic(
+  () => import("@/app/_components/game/PhaserGame").then((m) => m.PhaserGame),
+  { ssr: false, loading: () => <GameLoadingScreen /> },
+);
 
 export default function IdeLayoutPage() {
+  const sceneRef = useRef<GameScene | null>(null);
+  const [coords, setCoords] = useState({ x: 0, y: 0 });
+
+  // This fires every time the local player moves in Phaser
+  const handlePositionChange = useCallback((x: number, y: number) => {
+    setCoords({ x: Math.round(x), y: Math.round(y) });
+  }, []);
   return (
     <div className="bg-background flex h-full min-h-0 w-full flex-col">
       <div className="h-full min-h-0 flex-1">
@@ -24,16 +37,26 @@ export default function IdeLayoutPage() {
             />
           }
           right={<Builder />}
+          
           centerClassName="p-6"
         >
-          <div className={cn("border-border/50 bg-card rounded-lg border p-6 shadow-sm")}>
-            <h1 className="mb-2 text-xl font-semibold">IDE-style layout</h1>
-            <p className="text-muted-foreground">
-              Center is full width; right panel overlays on top. Drag the right edge to resize.
-            </p>
+          <div className="absolute inset-0">
+            <PhaserGame onPositionChange={handlePositionChange} sceneRef={sceneRef} />
+            <div className="absolute top-12 left-1/2 -translate-x-1/2 font-mono text-xs text-white/40">
+              {coords.x}, {coords.y}
+            </div>
           </div>
         </IdeLayout>
       </div>
+    </div>
+  );
+}
+
+function GameLoadingScreen() {
+  return (
+    <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-[#0d1117]">
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
+      <p className="font-mono text-sm text-white/40">Loading world...</p>
     </div>
   );
 }
