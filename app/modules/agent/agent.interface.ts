@@ -1,5 +1,15 @@
-export type AgentRole = 'pm' | 'fe' | 'be_sc' | 'marketing'
+
+export type AgentRole = 'pm' | 'fe' | 'be_sc' | 'bd_research'
 export type AgentEventType = 'agent.started' | 'agent.delta' | 'agent.done' | 'agent.error' | 'run.done'
+
+// Agent states for the pixel game UI
+export type AgentState =
+  | 'idle'
+  | 'discussing'
+  | 'planning'
+  | 'doing'
+  | 'completed'
+  | 'error'
 
 export interface StartRunBody {
   idea?: string

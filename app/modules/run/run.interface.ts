@@ -5,7 +5,8 @@ export type RunStatus = 'created' | 'planning' | 'executing' | 'awaiting_approva
 export type InputType = 'chat' | 'prd'
 
 // AgentRole enum
-export type AgentRole = 'pm' | 'fe' | 'be_sc' | 'marketing'
+
+export type AgentRole = 'pm' | 'fe' | 'be_sc' | 'bd_research'
 
 // AgentRunStatus enum
 export type AgentRunStatus = 'queued' | 'running' | 'completed' | 'failed'

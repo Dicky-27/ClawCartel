@@ -362,6 +362,16 @@ class RunService {
 
     return Number(result._max.seq ?? 0n) + 1
   }
+
+  // Get events for a specific agent run
+  async getAgentRunEvents(agentRunId: string): Promise<AgentEvent[]> {
+    const events = await db.agentEvent.findMany({
+      where: { agentRunId },
+      orderBy: { seq: 'asc' },
+    })
+
+    return events as unknown as AgentEvent[]
+  }
 }
 
 export const runService = new RunService()
