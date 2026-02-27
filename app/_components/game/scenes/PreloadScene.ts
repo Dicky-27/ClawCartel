@@ -1,115 +1,77 @@
 import Phaser from "phaser";
 
-/**
- * PreloadScene runs before GameScene.
- * Load all textures, atlases, tilemaps, and audio here.
- * Phaser will show a loading bar while assets download.
- */
 export class PreloadScene extends Phaser.Scene {
   constructor() {
     super({ key: "PreloadScene" });
   }
 
   preload() {
-    // Show a simple loading bar so the screen isn't blank
     this.createLoadingBar();
 
-    // For now we generate textures procedurally (no external image files needed).
-    // Later you'll replace these with actual sprite sheets:
-    //   this.load.spritesheet("player", "/assets/characters.png", { frameWidth: 48, frameHeight: 48 });
-    //   this.load.tilemapTiledJSON("map", "/assets/map.json");
-    //   this.load.image("tiles", "/assets/tileset.png");
+    // ── Tilemap ──────────────────────────────────────────────────────────────
+    this.load.tilemapTiledJSON("map", "/assets/map.json");
+
+    // ── Tileset images (keys must match "name" in map.json tilesets) ─────────
+    this.load.image("room-builder", "/assets/Room_Builder_free_48x48.png");
+    this.load.image("interiors",    "/assets/Interiors_free_48x48.png");
+
+    // ── Player — Bob spritesheet ─────────────────────────────────────────────
+    // Bob_run_16x16.png: 384×32 → 24 cols × 2 rows, each frame is 16×16 px
+    this.load.spritesheet("player", "/assets/Bob_run_16x16.png", {
+      frameWidth:  16,
+      frameHeight: 32,   // ← MUST be 16, not 32 (2 rows exist but each frame = 1 row)
+    });
+
+    // ── NPC character spritesheets ───────────────────────────────────────────
+    // Same layout: 24 cols × 2 rows, 16×16 per frame
+    const npcChars = ["Adam", "Alex", "Amelia", "Bob"];
+    for (const name of npcChars) {
+      this.load.spritesheet(
+        `npc-${name.toLowerCase()}`,
+        `/assets/${name}_run_16x16.png`,
+        { frameWidth: 16, frameHeight: 32 },  // ← fixed: was incorrectly 32
+      );
+    }
+
+    // ── Remote player placeholder (multiplayer — Phase 3) ───────────────────
+    this.generateRemotePlayerTexture();
   }
 
   create() {
-    // Generate placeholder textures programmatically so we can see something immediately
-    this.generateTextures();
     this.scene.start("GameScene");
   }
+
+  // ─── Loading Bar ──────────────────────────────────────────────────────────
 
   private createLoadingBar() {
     const { width, height } = this.scale;
     const cx = width / 2;
     const cy = height / 2;
 
-    const barBg = this.add.rectangle(cx, cy, 300, 20, 0x333333);
-    const bar = this.add.rectangle(cx - 150, cy, 0, 16, 0x4ade80);
-    bar.setOrigin(0, 0.5);
-
     this.add
-      .text(cx, cy - 30, "Loading...", {
+      .text(cx, cy - 40, "Loading world...", {
         fontSize: "16px",
         color: "#ffffff",
         fontFamily: "monospace",
       })
       .setOrigin(0.5);
 
-    this.load.on("progress", (value: number) => {
-      bar.width = 300 * value;
-    });
+    this.add.rectangle(cx, cy, 300, 16, 0x222222);
+    const bar = this.add.rectangle(cx - 150, cy, 0, 12, 0x6366f1);
+    bar.setOrigin(0, 0.5);
+
+    this.load.on("progress", (v: number) => { bar.width = 300 * v; });
   }
 
-  private generateTextures() {
-    // Floor tile - a subtle grid square
-    const floorGraphics = this.make.graphics({ x: 0, y: 0 });
-    floorGraphics.fillStyle(0x1a2035, 1);
-    floorGraphics.fillRect(0, 0, 32, 32);
-    floorGraphics.lineStyle(1, 0x2a3045, 0.5);
-    floorGraphics.strokeRect(0, 0, 32, 32);
-    floorGraphics.generateTexture("floor", 32, 32);
-    floorGraphics.destroy();
+  // ─── Remote player texture (simple coloured circle, no spritesheet needed) ─
 
-    // Wall tile - solid darker block
-    const wallGraphics = this.make.graphics({ x: 0, y: 0 });
-    wallGraphics.fillStyle(0x0d1117, 1);
-    wallGraphics.fillRect(0, 0, 32, 32);
-    wallGraphics.lineStyle(2, 0x30363d, 1);
-    wallGraphics.strokeRect(0, 0, 32, 32);
-    wallGraphics.generateTexture("wall", 32, 32);
-    wallGraphics.destroy();
-
-    // Player - a colored circle with a direction indicator
-    const playerGraphics = this.make.graphics({ x: 0, y: 0 });
-    playerGraphics.fillStyle(0x6366f1, 1); // indigo body
-    playerGraphics.fillCircle(16, 16, 14);
-    playerGraphics.fillStyle(0xffffff, 0.9);
-    playerGraphics.fillCircle(16, 12, 5); // head highlight
-    playerGraphics.generateTexture("player", 32, 32);
-    playerGraphics.destroy();
-
-    // Other player (different color)
-    const otherGraphics = this.make.graphics({ x: 0, y: 0 });
-    otherGraphics.fillStyle(0xf43f5e, 1); // rose body
-    otherGraphics.fillCircle(16, 16, 14);
-    otherGraphics.fillStyle(0xffffff, 0.9);
-    otherGraphics.fillCircle(16, 12, 5);
-    otherGraphics.generateTexture("other-player", 32, 32);
-    otherGraphics.destroy();
-
-    // Desk furniture
-    const deskGraphics = this.make.graphics({ x: 0, y: 0 });
-    deskGraphics.fillStyle(0x7c3aed, 1);
-    deskGraphics.fillRoundedRect(2, 8, 60, 32, 4);
-    deskGraphics.fillStyle(0x4c1d95, 1);
-    deskGraphics.fillRect(4, 36, 8, 8); // desk leg
-    deskGraphics.fillRect(54, 36, 8, 8); // desk leg
-    deskGraphics.generateTexture("desk", 64, 48);
-    deskGraphics.destroy();
-
-    // Chair furniture
-    const chairGraphics = this.make.graphics({ x: 0, y: 0 });
-    chairGraphics.fillStyle(0x0891b2, 1);
-    chairGraphics.fillRoundedRect(4, 4, 24, 24, 4);
-    chairGraphics.generateTexture("chair", 32, 32);
-    chairGraphics.destroy();
-
-    // Plant decoration
-    const plantGraphics = this.make.graphics({ x: 0, y: 0 });
-    plantGraphics.fillStyle(0x166534, 1);
-    plantGraphics.fillCircle(16, 12, 12);
-    plantGraphics.fillStyle(0xb45309, 1);
-    plantGraphics.fillRect(12, 22, 8, 10); // pot
-    plantGraphics.generateTexture("plant", 32, 32);
-    plantGraphics.destroy();
+  private generateRemotePlayerTexture() {
+    const g = this.make.graphics({ x: 0, y: 0 });
+    g.fillStyle(0xf43f5e, 1);
+    g.fillCircle(20, 20, 18);
+    g.fillStyle(0xffffff, 0.85);
+    g.fillCircle(20, 13, 6);
+    g.generateTexture("other-player", 40, 40);
+    g.destroy();
   }
 }
