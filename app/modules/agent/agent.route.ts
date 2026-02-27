@@ -8,6 +8,10 @@ export default function (
   _: FastifyPluginOptions,
   done: DoneFuncWithErrOrRes
 ) {
+  // Health check
+  app.get('/health', AgentController.health)
+
+  // Start a new run
   app.post<{ Body: StartRunBody }>(
     '/runs',
     { schema: AgentSchema.startRun },

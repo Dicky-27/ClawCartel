@@ -30,7 +30,7 @@ enum AgentRole {
   pm
   fe
   be_sc
-  marketing
+  bd_research
 }
 
 enum AgentRunStatus {
