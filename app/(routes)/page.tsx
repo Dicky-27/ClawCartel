@@ -3,13 +3,14 @@
 import { ChatPanel, DUMMY_CHAT_MESSAGES } from "@/app/_components/ChatPanel";
 import { IdeLayout } from "@/app/_components/IdeLayout";
 import { cn } from "@/app/_libs/utils";
+import Builder from "../_components/builders/Builder";
 
 export default function IdeLayoutPage() {
   return (
-    <div className="h-screen w-screen bg-background">
+    <div className="bg-background h-screen w-screen">
       <IdeLayout
         defaultLeftSize={28}
-        defaultRightSize={22}
+        defaultRightWidth={300}
         left={
           <ChatPanel
             title="Chat"
@@ -22,24 +23,13 @@ export default function IdeLayoutPage() {
             }
           />
         }
-        right={
-          <div className="flex h-full flex-col border-l border-border/50 bg-muted/30">
-            <div className="border-b border-border/50 px-3 py-2 text-xs font-medium text-muted-foreground">
-              OUTLINE
-            </div>
-            <div className="flex-1 overflow-auto p-2 text-sm text-muted-foreground">
-              <div>IdeLayout</div>
-              <div className="ml-2">IdeLayoutProps</div>
-              <div className="ml-2">left, children, right</div>
-            </div>
-          </div>
-        }
+        right={<Builder />}
         centerClassName="p-6"
       >
-        <div className={cn("rounded-lg border border-border/50 bg-card p-6 shadow-sm")}>
+        <div className={cn("border-border/50 bg-card rounded-lg border p-6 shadow-sm")}>
           <h1 className="mb-2 text-xl font-semibold">IDE-style layout</h1>
           <p className="text-muted-foreground">
-            Drag the dividers between left, center, and right to resize.
+            Center is full width; right panel overlays on top. Drag the right edge to resize.
           </p>
         </div>
       </IdeLayout>
