@@ -168,7 +168,7 @@ export function IdeLayout({
                 />
                 <div
                   className={cn(
-                    "border-border bg-background absolute top-0 right-0 bottom-0 z-10 flex flex-col overflow-hidden border-l shadow-lg",
+                    "bg-background absolute top-0 right-0 bottom-0 z-10 flex flex-col overflow-hidden border-l",
                     rightClassName,
                   )}
                   style={{ width: rightWidth }}

@@ -119,7 +119,7 @@ export default function Builder() {
   }
 
   return (
-    <div className="border-border/50 bg-muted/30 flex h-full flex-col border-l">
+    <div className="flex h-full flex-col">
       <Tabs defaultValue="preview" className="flex h-full flex-1 flex-col gap-0 px-0">
         <div className="shrink-0 p-2">
           <TabsList className="bg-primary/10 p-1">
