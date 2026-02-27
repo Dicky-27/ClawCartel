@@ -16,6 +16,119 @@
   }
 }
 
+/* ─── Pixelated loading screen ─────────────────────────────────────────────── */
+@keyframes pixel-glow {
+  0%,
+  100% {
+    opacity: 0.2;
+    transform: scale(0.85);
+    box-shadow: 0 0 0 transparent;
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 6px color-mix(in oklch, var(--primary) 70%, transparent);
+  }
+}
+
+/* Wave: fill bar blocks left-to-right then reset */
+@keyframes pixel-bar-fill {
+  0% {
+    background-color: rgb(255 255 255 / 0.08);
+    transform: scaleY(0.7);
+  }
+  5% {
+    background-color: color-mix(in oklch, var(--primary) 95%, white);
+    transform: scaleY(1);
+  }
+  95% {
+    background-color: color-mix(in oklch, var(--primary) 95%, white);
+    transform: scaleY(1);
+  }
+  100% {
+    background-color: rgb(255 255 255 / 0.08);
+    transform: scaleY(0.7);
+  }
+}
+
+@keyframes pixel-bar-block {
+  0%,
+  100% {
+    background-color: rgb(255 255 255 / 0.08);
+    transform: scaleY(0.75);
+  }
+  50% {
+    background-color: color-mix(in oklch, var(--primary) 90%, transparent);
+    transform: scaleY(1);
+  }
+}
+
+.pixel-glow {
+  animation: pixel-glow 1.4s ease-in-out infinite;
+}
+
+.pixel-bar-block {
+  animation: pixel-bar-block 1.2s ease-in-out infinite;
+}
+
+/* Scanline overlay (retro CRT feel) */
+@keyframes pixel-scanline {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100vh);
+  }
+}
+
+.pixel-scanline {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgb(0 0 0 / 0.03) 50%,
+    transparent 100%
+  );
+  background-size: 100% 4px;
+  animation: pixel-scanline 2.5s linear infinite;
+}
+
+/* Pixelated loader: grid cells pop in sequence */
+@keyframes pixel-cell-in {
+  0% {
+    opacity: 0.2;
+    transform: scale(0.6);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0.4;
+    transform: scale(0.9);
+  }
+}
+
+@keyframes pixel-loader-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pixel-loader-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

@@ -3,12 +3,13 @@
 import { ChatPanel, DUMMY_CHAT_MESSAGES } from "@/app/_components/chats/ChatPanel";
 import type { GameScene } from "@/app/_components/game/scenes/GameScene";
 import { IdeLayout } from "@/app/_components/IdeLayout";
+import { PixelatedLoadingScreen } from "@/app/_components/ui/PixelatedLoadingScreen";
 import dynamic from "next/dynamic";
 import { useCallback, useRef, useState } from "react";
 import Builder from "../_components/builders/Builder";
 const PhaserGame = dynamic(
   () => import("@/app/_components/game/PhaserGame").then((m) => m.PhaserGame),
-  { ssr: false, loading: () => <GameLoadingScreen /> },
+  { ssr: false, loading: () => <PixelatedLoadingScreen message="Loading world..." /> },
 );
 
 export default function IdeLayoutPage() {
@@ -52,11 +53,3 @@ export default function IdeLayoutPage() {
   );
 }
 
-function GameLoadingScreen() {
-  return (
-    <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-[#0d1117]">
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
-      <p className="font-mono text-sm text-white/40">Loading world...</p>
-    </div>
-  );
-}

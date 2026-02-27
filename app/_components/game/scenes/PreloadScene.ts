@@ -57,7 +57,7 @@ export class PreloadScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.add.rectangle(cx, cy, 300, 16, 0x222222);
-    const bar = this.add.rectangle(cx - 150, cy, 0, 12, 0x6366f1);
+    const bar = this.add.rectangle(cx - 150, cy, 0, 12, 0x2dd4a0); /* primary green */
     bar.setOrigin(0, 0.5);
 
     this.load.on("progress", (v: number) => { bar.width = 300 * v; });

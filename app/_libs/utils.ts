@@ -93,22 +93,22 @@ export function getColorById(id: string): { bg: string; text: string } {
   return { bg, text };
 }
 
-/** Solana-themed palette: purple range + green accent, works on dark */
+/** Primary-themed palette: green/teal range, works on dark */
 const SOLANA_PALETTE: [string, string][] = [
-  ["#9945FF", "#E8D5FF"], // Solana purple
   ["#14F195", "#0D2818"], // Solana green
+  ["#2dd4a0", "#0D2818"], // primary green
   ["#00D4AA", "#002E24"], // teal
-  ["#7C3AED", "#EDE9FE"], // violet
+  ["#5eead4", "#134e4a"], // teal-300
   ["#06B6D4", "#083344"], // cyan
-  ["#A855F7", "#F3E8FF"], // fuchsia
-  ["#6366F1", "#E0E7FF"], // indigo
+  ["#6bcf9c", "#1a3329"], // primary
+  ["#34d399", "#064e3b"], // emerald
   ["#0EA5E9", "#0C4A6E"], // sky
-  ["#8B5CF6", "#2E1065"], // purple
+  ["#4ade80", "#14532d"], // green-400
   ["#22D3EE", "#164E63"], // cyan-400
 ];
 
 /**
- * Solana-themed stable color for an id (wallet, user). Purple/green/teal range.
+ * Primary-themed stable color for an id (wallet, user). Green/teal range.
  */
 export function getSolanaColorById(id: string): { bg: string; text: string } {
   const index = hashString(String(id)) % SOLANA_PALETTE.length;
