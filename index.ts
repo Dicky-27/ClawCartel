@@ -3,6 +3,7 @@ import routes from '#app/routes/index'
 import AppConfig from '#app/config/app'
 import FastifyUtil from '#app/utils/fastify'
 import Logger from '#app/utils/logger'
+import { registerSocket } from '#app/utils/socket'
 
 const fastify = Fastify({
   logger: {
@@ -32,6 +33,8 @@ const fastify = Fastify({
 
     await fastify.register(routes)
     await fastify.ready()
+
+    registerSocket(fastify)
 
     const { host, port } = AppConfig.app
     await fastify.listen({ host, port })
