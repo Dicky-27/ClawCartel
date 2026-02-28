@@ -12,6 +12,9 @@ const AuthSchema = {
     },
     response: {
       200: {
+        status: 200,
+        code: 'SUCCESS',
+        message: 'Nonce generated successfully',
         type: 'object',
         required: ['status', 'data'],
         properties: {
@@ -30,8 +33,21 @@ const AuthSchema = {
         },
       },
     },
+    examples: {
+      success: {
+        value: {
+          status: 200,
+          code: 'SUCCESS',
+          message: 'Nonce generated successfully',
+          data: {
+            nonce: '1234567890',
+            message: '1234567890',
+            expiresAt: '2026-02-28T12:00:00.000Z',
+          },
+        },
+      },
+    },
   },
-
   siwsVerify: {
     tags: ['Auth'],
     summary: 'Verify SIWS signature',
@@ -47,6 +63,9 @@ const AuthSchema = {
     },
     response: {
       200: {
+        status: 200,
+        code: 'SUCCESS',
+        message: 'Signature verified successfully',
         type: 'object',
         required: ['status', 'data'],
         properties: {
@@ -62,6 +81,36 @@ const AuthSchema = {
               walletAddress: { type: ['string', 'null'], description: 'Wallet address' },
             },
           },
+        },
+      },
+      error: {
+        value: {
+          status: 500,
+          code: 'ERROR',
+          message: 'Internal server error',
+          data: null,
+        },
+      },
+    },
+    examples: {
+      success: {
+        value: {
+          status: 200,
+          code: 'SUCCESS',
+          message: 'Signature verified successfully',
+          data: {
+            token: '1234567890',
+            userId: 1,
+            walletAddress: '1234567890',
+          },
+        },
+      },
+      error: {
+        value: {
+          status: 500,
+          code: 'ERROR',
+          message: 'Internal server error',
+          data: null,
         },
       },
     },

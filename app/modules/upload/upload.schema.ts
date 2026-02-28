@@ -9,6 +9,36 @@ const UploadSchema = {
         file: { type: 'string', format: 'binary' },
       },
     },
+    response: {
+      200: {
+        status: 200,
+        code: 'SUCCESS',
+        message: 'File uploaded successfully',
+        data: {
+          url: 'https://cdn.example.com/file.jpg',
+        },
+      },
+    },
+    error: {
+      value: {
+        status: 500,
+        code: 'ERROR',
+        message: 'Internal server error',
+        data: null,
+      },
+    },
+    examples: {
+      success: {
+        value: {
+          status: 200,
+          code: 'SUCCESS',
+          message: 'File uploaded successfully',
+          data: {
+            url: 'https://cdn.example.com/file.jpg',
+          },
+        },
+      },
+    },
   },
   getCDNUrl: {
     tags: ['Upload'],
@@ -18,6 +48,44 @@ const UploadSchema = {
       type: 'object',
       properties: {
         key: { type: 'string' },
+      },
+    },
+    response: {
+      200: {
+        status: 200,
+        code: 'SUCCESS',
+        message: 'CDN URL retrieved successfully',
+        data: {
+          url: 'https://cdn.example.com/file.jpg',
+        },
+      },
+    },
+    error: {
+      value: {
+        status: 500,
+        code: 'ERROR',
+        message: 'Internal server error',
+        data: null,
+      },
+    },
+  },
+  examples: {
+    success: {
+      value: {
+        status: 200,
+        code: 'SUCCESS',
+        message: 'CDN URL retrieved successfully',
+        data: {
+          url: 'https://cdn.example.com/file.jpg',
+        },
+      },
+    },
+    error: {
+      value: {
+        status: 500,
+        code: 'ERROR',
+        message: 'Internal server error',
+        data: null,
       },
     },
   },
