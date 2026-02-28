@@ -7,56 +7,28 @@ const AuthController = {
     request: FastifyRequest<{ Body: SiwsNonceBody }>,
     reply: FastifyReply
   ) => {
-    try {
-      const { address } = request.body
-      const data = await AuthService.generateSiwsNonce(address)
+    const { address } = request.body
+    const data = await AuthService.generateSiwsNonce(address)
 
-      return reply.json({
-        status: 200,
-        code: 'SUCCESS',
-        message: 'Nonce generated successfully',
-        data: {
-          nonce: data.nonce,
-          message: data.message,
-          expiresAt: data.expiresAt,
-        },
-      })
-    } catch (error) {
-      return reply.json({
-        status: 500,
-        code: 'ERROR',
-        message: 'Internal server error',
-        data: null,
-      })
-    }
+    return reply.json({
+      nonce: data.nonce,
+      message: data.message,
+      expiresAt: data.expiresAt,
+    })
   },
 
   siwsVerify: async (
     request: FastifyRequest<{ Body: SiwsVerifyBody }>,
     reply: FastifyReply
   ) => {
-    try {
-      const { address, message, signature } = request.body
-      const data = await AuthService.verifySiwsSignature(address, message, signature)
+    const { address, message, signature } = request.body
+    const data = await AuthService.verifySiwsSignature(address, message, signature)
 
-      return reply.json({
-        status: 200,
-        code: 'SUCCESS',
-        message: 'Signature verified successfully',
-        data: {
-          token: data.token,
-          userId: data.userId,
-          walletAddress: data.walletAddress,
-        },
-      })
-    } catch (error) {
-      return reply.json({
-        status: 500,
-        code: 'ERROR',
-        message: 'Internal server error',
-        data: null,
-      })
-    }
+    return reply.json({
+      token: data.token,
+      userId: data.userId,
+      walletAddress: data.walletAddress,
+    })
   },
 }
 
