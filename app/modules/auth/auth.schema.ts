@@ -12,6 +12,9 @@ const AuthSchema = {
     },
     response: {
       200: {
+        status: 200,
+        code: 'SUCCESS',
+        message: 'Nonce generated successfully',
         type: 'object',
         required: ['nonce', 'message', 'expiresAt'],
         properties: {
@@ -38,6 +41,9 @@ const AuthSchema = {
     },
     response: {
       200: {
+        status: 200,
+        code: 'SUCCESS',
+        message: 'Signature verified successfully',
         type: 'object',
         required: ['token', 'userId', 'walletAddress'],
         properties: {
