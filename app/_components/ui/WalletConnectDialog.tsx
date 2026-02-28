@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { LogOutIcon, WalletIcon } from "lucide-react";
+import { LogInIcon, LogOutIcon } from "lucide-react";
+import { useAuth } from "@/app/_providers/AuthProvider";
 import { useSolana } from "@/app/_providers/SolanaProvider";
 import { truncateId } from "@/app/_libs/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/app/_components/ui/avatar";
@@ -23,9 +25,7 @@ export function WalletIconAvatar({
 }) {
   return (
     <Avatar className={className} size="sm">
-      {wallet.icon && (
-        <AvatarImage src={wallet.icon} alt={`${wallet.name} icon`} />
-      )}
+      {wallet.icon && <AvatarImage src={wallet.icon} alt={`${wallet.name} icon`} />}
       <AvatarFallback>{wallet.name.slice(0, 2).toUpperCase()}</AvatarFallback>
     </Avatar>
   );
@@ -52,11 +52,23 @@ function DisconnectButton() {
       className="gap-2"
     >
       <LogOutIcon className="size-4" />
-      {isSigning
-        ? "Signing…"
-        : disconnecting
-          ? "Disconnecting…"
-          : "Disconnect"}
+      {isSigning ? "Signing…" : disconnecting ? "Disconnecting…" : "Disconnect"}
+    </Button>
+  );
+}
+
+function SignInButton() {
+  const { authenticate, isVerifying } = useAuth();
+  const { isSigning } = useSolana();
+
+  return (
+    <Button
+      className="gap-2"
+      onClick={() => authenticate().catch(console.error)}
+      disabled={isVerifying || isSigning}
+    >
+      <LogInIcon className="size-4" />
+      {isVerifying || isSigning ? "Signing in…" : "Sign in"}
     </Button>
   );
 }
@@ -66,15 +78,21 @@ function DisconnectButton() {
  * calls setOpen(true) and SolanaProvider opens the wallet adapter modal instead.
  */
 export function WalletConnectDialog() {
-  const {
-    wallets,
-    selectedWallet,
-    selectedAccount,
-    isConnected,
-    isSigning,
-    open,
-    setOpen,
-  } = useSolana();
+  const { wallets, selectedWallet, selectedAccount, isConnected, isSigning, open, setOpen } =
+    useSolana();
+  const { isAuthenticated } = useAuth();
+  const hasAutoOpenedAfterConnect = useRef(false);
+
+  useEffect(() => {
+    if (isConnected && !isAuthenticated) {
+      if (!hasAutoOpenedAfterConnect.current) {
+        hasAutoOpenedAfterConnect.current = true;
+        setOpen(true);
+      }
+    } else if (!isConnected) {
+      hasAutoOpenedAfterConnect.current = false;
+    }
+  }, [isConnected, isAuthenticated, setOpen]);
 
   if (!isConnected) {
     return null;
@@ -84,17 +102,15 @@ export function WalletConnectDialog() {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle className="text-center text-xl font-semibold">
-            Connected Wallet
-          </DialogTitle>
+          <DialogTitle className="text-center text-xl font-semibold">Connected Wallet</DialogTitle>
           <DialogDescription className="text-center">
-            You are connected with the following wallet.
+            {isAuthenticated
+              ? "You are connected with the following wallet."
+              : "Sign in with your wallet to use the app."}
           </DialogDescription>
         </DialogHeader>
         {wallets.length === 0 ? (
-          <p className="text-muted-foreground py-4 text-center text-sm">
-            No wallets detected
-          </p>
+          <p className="text-muted-foreground py-4 text-center text-sm">No wallets detected</p>
         ) : (
           selectedWallet &&
           selectedAccount && (
@@ -106,13 +122,11 @@ export function WalletConnectDialog() {
                     {isSigning ? "Signing…" : selectedWallet.name}
                   </p>
                   <p className="text-muted-foreground font-mono text-xs">
-                    {isSigning
-                      ? "…"
-                      : truncateId(selectedAccount.address, 6, 6)}
+                    {isSigning ? "…" : truncateId(selectedAccount.address, 6, 6)}
                   </p>
                 </div>
               </div>
-              <DisconnectButton />
+              {!isAuthenticated ? <SignInButton /> : <DisconnectButton />}
             </div>
           )
         )}

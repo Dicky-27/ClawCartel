@@ -3,14 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --webpack -p 3001",
-    "build": "next build --webpack",
+    "dev": "next dev --turbopack",
+    "build": "next build",
     "start": "next start -H 0.0.0.0 -p 80",
-    "lint": "eslint"
+    "lint": "next lint"
   },
   "dependencies": {
-    "@ducanh2912/next-pwa": "^10.2.9",
     "@base-ui/react": "^1.1.0",
+    "@ducanh2912/next-pwa": "^10.2.9",
     "@solana-mobile/wallet-standard-mobile": "^0.4.4",
     "@solana/wallet-adapter-base": "^0.9.27",
     "@solana/wallet-adapter-react": "^0.15.39",
@@ -22,6 +22,7 @@
     "@types/react-syntax-highlighter": "^15.5.13",
     "@webcontainer/api": "^1.6.1",
     "axios": "^1.13.5",
+    "bs58": "^6.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
