@@ -50,14 +50,19 @@ const FastifyUtil = {
         this: FastifyReply,
         data: object | string | number | boolean | null = null,
         status = 200,
-        code: string | null = null,
         message: string | null = null
       ) {
+        const isSuccess = status >= 200 && status < 300
+
         this.status(status).send({
           status,
-          code,
+          success: isSuccess,
           message,
-          data,
+          data: isSuccess ? data : null,
+          error: !isSuccess ? { code: 'ERROR', message: String(data) } : undefined,
+          meta: {
+            timestamp: new Date().toISOString(),
+          },
         })
       }
     )
@@ -69,28 +74,22 @@ const FastifyUtil = {
       request: FastifyRequest,
       reply: FastifyReply
     ) {
-      if (error instanceof AppException) {
-        reply.status(error.status).send({
-          status: error.status,
-          code: error.code,
-          message: error.message,
-          data: null,
-        })
-      } else if (error instanceof Error) {
-        reply.status(500).send({
-          status: 500,
-          code: error.code ?? 'SYSTEM_ERROR',
-          message: error.message ?? 'An error occured on the system',
-          data: null,
-        })
-      } else {
-        reply.status(500).send({
-          status: 500,
-          code: 'SYSTEM_ERROR',
-          message: 'An error occured on the system',
-          data: null,
-        })
-      }
+      // Use standardized response format
+      const status = error.statusCode || 500
+      const code = (error as any).code || 'SYSTEM_ERROR'
+      const message = error.message || 'An error occurred on the system'
+
+      return reply.status(status).send({
+        status,
+        success: false,
+        error: {
+          code,
+          message,
+        },
+        meta: {
+          timestamp: new Date().toISOString(),
+        },
+      })
     })
   },
 
