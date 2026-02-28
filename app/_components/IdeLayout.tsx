@@ -176,7 +176,7 @@ export function IdeLayout({
                 aria-label="Chat"
               >
                 <MessageSquareIcon className="size-5" />
-                <span className="text-[10px] font-medium">Chat</span>
+                <span className="font-geist-medium text-[10px] font-medium">Chat</span>
               </button>
             )}
             <button
@@ -190,7 +190,7 @@ export function IdeLayout({
               aria-label="Home"
             >
               <LayoutDashboardIcon className="size-5" />
-              <span className="text-[10px] font-medium">Home</span>
+              <span className="font-geist-medium text-[10px] font-medium">Home</span>
             </button>
             {hasRight && (
               <button
@@ -204,7 +204,7 @@ export function IdeLayout({
                 aria-label="Builder"
               >
                 <Code2Icon className="size-5" />
-                <span className="text-[10px] font-medium">Builder</span>
+                <span className="font-geist-medium text-[10px] font-medium">Builder</span>
               </button>
             )}
           </nav>

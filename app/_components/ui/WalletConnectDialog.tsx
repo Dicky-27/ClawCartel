@@ -49,7 +49,7 @@ function DisconnectButton() {
       variant="outline"
       onClick={handleDisconnect}
       disabled={disconnecting || isLoading || isSigning}
-      className="gap-2"
+      className="font-geist-medium gap-2"
     >
       <LogOutIcon className="size-4" />
       {isSigning ? "Signing…" : disconnecting ? "Disconnecting…" : "Disconnect"}
@@ -63,7 +63,7 @@ function SignInButton() {
 
   return (
     <Button
-      className="gap-2"
+      className="font-geist-medium gap-2"
       onClick={() => authenticate().catch(console.error)}
       disabled={isVerifying || isSigning}
     >
@@ -102,7 +102,7 @@ export function WalletConnectDialog() {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle className="text-center text-xl font-semibold">Connected Wallet</DialogTitle>
+          <DialogTitle className="text-center font-geist-semi-bold text-xl font-semibold">Connected Wallet</DialogTitle>
           <DialogDescription className="text-center">
             {isAuthenticated
               ? "You are connected with the following wallet."
@@ -118,7 +118,7 @@ export function WalletConnectDialog() {
               <div className="border-border bg-muted/30 flex items-center gap-3 rounded-lg border px-4 py-3">
                 <WalletIconAvatar wallet={selectedWallet} className="size-10" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-foreground text-sm font-medium">
+                  <p className="text-foreground font-geist-medium text-sm font-medium">
                     {isSigning ? "Signing…" : selectedWallet.name}
                   </p>
                   <p className="text-muted-foreground font-mono text-xs">

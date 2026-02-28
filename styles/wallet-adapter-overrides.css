@@ -15,7 +15,7 @@
   color: var(--card-foreground);
   border: 1px solid var(--border);
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-  font-family: var(--font-dmSans), system-ui, sans-serif;
+  font-family: var(--font-geist-regular), system-ui, sans-serif;
 }
 
 .wallet-adapter-modal-title {

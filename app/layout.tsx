@@ -40,7 +40,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning className="h-full">
       <head />
-      <body className="h-full min-h-screen" suppressHydrationWarning>
+      <body className="h-full min-h-screen font-sans" suppressHydrationWarning>
         <Providers>
           <GlobalLoadingGate>
             <div className="flex h-full min-h-screen flex-col">

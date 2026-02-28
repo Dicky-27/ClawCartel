@@ -2,3 +2,38 @@
   font-family: "DM-Sans";
   src: url("/fonts/DMSans-VariableFont.ttf");
 }
+
+@font-face {
+  font-family: "Geist-Bold";
+  src: url("/fonts/Geist-Bold.ttf");
+}
+
+@font-face {
+  font-family: "Geist-Regular";
+  src: url("/fonts/Geist-Regular.ttf");
+}
+
+@font-face {
+  font-family: "Geist-Medium";
+  src: url("/fonts/Geist-Medium.ttf");
+}
+
+@font-face {
+  font-family: "Geist-SemiBold";
+  src: url("/fonts/Geist-SemiBold.ttf");
+}
+
+@font-face {
+  font-family: "PixeloidMono";
+  src: url("/fonts/PixeloidMono.ttf");
+}
+
+@font-face {
+  font-family: "PixeloidSans-Bold";
+  src: url("/fonts/PixeloidSans-Bold.ttf");
+}
+
+@font-face {
+  font-family: "PixeloidSans";
+  src: url("/fonts/PixeloidSans.ttf");
+}

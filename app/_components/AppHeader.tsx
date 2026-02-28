@@ -20,7 +20,7 @@ export function AppHeader({ className }: { className?: string }) {
           height={50}
           className="size-8 rounded-lg object-contain"
         />
-        <h1 className="text-primary text-sm font-bold">Claw Cartel</h1>
+        <h1 className="text-primary font-pixeloid-sans-bold text-sm font-bold">Claw Cartel</h1>
       </div>
       <WalletConnectButton />
     </header>

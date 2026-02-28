@@ -188,7 +188,7 @@ export function ChatPanel({
   return (
     <div className={cn("bg-background flex h-full flex-col", className)}>
       <div className="border-border/50 flex items-center justify-between border-b px-3 py-2 pr-10">
-        <span className="text-xs font-bold">Chat</span>
+        <span className="font-geist-semi-bold text-xs font-bold">Chat</span>
         <Popover open={agentsOpen} onOpenChange={setAgentsOpen}>
           <PopoverTrigger
             className="hover:bg-accent hover:text-accent-foreground inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-xs"

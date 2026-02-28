@@ -108,7 +108,7 @@ export default function Builder() {
     return (
       <div className="flex h-full flex-col items-center justify-center p-4 text-center">
         <div className="border-border bg-muted/50 rounded-lg border p-6">
-          <h2 className="text-foreground text-lg font-semibold">WebContainer not supported</h2>
+          <h2 className="text-foreground font-geist-semi-bold text-lg font-semibold">WebContainer not supported</h2>
           <p className="text-muted-foreground mt-2 text-sm">
             This needs cross-origin isolation. Use a supported browser (Chrome, Edge, Firefox, or
             Safari 16.4+).

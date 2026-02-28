@@ -18,7 +18,7 @@ export function TerminalCard({ output }: TerminalCardProps) {
   return (
     <div className="flex h-full flex-col">
       <div className="border-border border-b px-4 py-2">
-        <h2 className="text-foreground text-sm font-semibold">Terminal</h2>
+        <h2 className="text-foreground font-geist-semi-bold text-sm font-semibold">Terminal</h2>
       </div>
       <div className="flex-1 overflow-hidden rounded-b-lg bg-black p-0">
         <pre

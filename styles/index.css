@@ -137,7 +137,7 @@
     @apply cursor-pointer;
   }
   html {
-    @apply text-foreground bg-background  font-dmSans scroll-smooth font-normal antialiased;
+    @apply text-foreground bg-background font-sans scroll-smooth font-normal antialiased;
     font-synthesis: none;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;

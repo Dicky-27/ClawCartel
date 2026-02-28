@@ -42,7 +42,7 @@ export function AgentCard({
         />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="text-foreground font-semibold">{agent.name}</span>
+            <span className="text-foreground font-geist-semi-bold font-semibold">{agent.name}</span>
             {selected && (
               <MessageSquareIcon className="text-primary size-3.5 shrink-0" aria-hidden />
             )}

@@ -85,7 +85,7 @@ export function PixelatedLoadingScreen({
         ))}
       </div>
 
-      <p className="font-mono text-sm tracking-[0.2em] text-white/55 [font-feature-settings:'tnum']">
+      <p className="font-pixeloid-sans text-sm tracking-[0.2em] text-white/55 [font-feature-settings:'tnum']">
         {message}
       </p>
     </div>

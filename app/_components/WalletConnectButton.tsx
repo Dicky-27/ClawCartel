@@ -23,7 +23,7 @@ export function WalletConnectButton() {
       size="sm"
       disabled={loading || isVerifying}
       onClick={handleClick}
-      className="gap-2"
+      className="font-geist-medium gap-2"
     >
       {loading ? (
         <>

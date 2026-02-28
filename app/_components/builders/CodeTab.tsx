@@ -73,7 +73,7 @@ export default function CodeTab({
           )}
         >
           <div className="border-border flex h-10 shrink-0 items-center justify-between border-b px-3 py-2 md:block">
-            <h2 className="text-foreground text-sm font-semibold">Files</h2>
+            <h2 className="text-foreground font-geist-semi-bold text-sm font-semibold">Files</h2>
             <button
               type="button"
               onClick={() => setMobileFilesOpen(false)}

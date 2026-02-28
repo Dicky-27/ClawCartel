@@ -21,7 +21,7 @@ export function AgentsPanel({
     <div className={cn("flex flex-col", className)}>
       <div className="border-border flex items-center gap-2 border-b px-3 py-2">
         <BotIcon className="text-muted-foreground size-4 shrink-0" />
-        <h2 className="font-semibold text-foreground text-sm">Agents</h2>
+        <h2 className="font-geist-semi-bold text-foreground text-sm font-semibold">Agents</h2>
       </div>
       <div className="flex flex-col gap-1.5 p-2">
         {AGENTS.map((agent) => (
