@@ -5,6 +5,7 @@ import {
   StartRunBody,
 } from '#app/modules/agent/agent.interface'
 import AgentService from '#app/modules/agent/agent.service'
+import { continueToDevelopment } from '#app/modules/agent/autonomous.service'
 import Logger from '#app/utils/logger'
 
 const AgentController = {
@@ -64,6 +65,25 @@ const AgentController = {
     )
 
     return reply.json(events)
+  },
+
+  continueToDevelopment: async (
+    request: FastifyRequest<{
+      Params: RunParams;
+      Body: { approved: boolean }
+    }>,
+    reply: FastifyReply
+  ) => {
+    const { runId } = request.params
+    const { approved } = request.body
+
+    await continueToDevelopment(request.server, runId, approved)
+
+    return reply.json({
+      success: true,
+      message: approved ? 'Development phase started' : 'Run cancelled',
+      runId
+    })
   },
 }
 

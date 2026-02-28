@@ -346,6 +346,7 @@ class RunService {
         seq: e.seq.toString(),
         eventType: e.eventType,
         payload: e.payload as Record<string, unknown>,
+        role: e.agentRun.role,
         agentRole: e.agentRun.role,
         agentId: e.agentRun.agentId,
         createdAt: e.createdAt,

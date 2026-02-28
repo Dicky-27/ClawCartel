@@ -35,5 +35,15 @@ export default function (
     AgentController.getEvents
   )
 
+  // Continue to development phase
+  app.post<{
+    Params: RunParams;
+    Body: { approved: boolean }
+  }>(
+    '/runs/:runId/continue',
+    { schema: AgentSchema.runParams },
+    AgentController.continueToDevelopment
+  )
+
   done()
 }

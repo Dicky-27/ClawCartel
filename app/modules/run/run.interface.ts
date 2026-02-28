@@ -1,5 +1,5 @@
 // RunStatus enum
-export type RunStatus = 'created' | 'planning' | 'executing' | 'awaiting_approval' | 'completed' | 'failed'
+export type RunStatus = 'created' | 'planning' | 'executing' | 'awaiting_approval' | 'completed' | 'failed' | 'cancelled'
 
 // InputType enum
 export type InputType = 'chat' | 'prd'
@@ -134,7 +134,7 @@ export interface AgentEventWithAgentRun extends AgentEvent {
   }
 }
 
-// Replay response
+// Replay response (shape matches live agent_event so frontend can use one handler)
 export interface ReplayEventsResponse {
   runId: string
   totalEvents: number
@@ -142,7 +142,8 @@ export interface ReplayEventsResponse {
     seq: string
     eventType: EventType
     payload: Record<string, unknown>
-    agentRole: AgentRole
+    role: AgentRole
+    agentRole?: AgentRole
     agentId: string
     createdAt: Date
   }>

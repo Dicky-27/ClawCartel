@@ -28,6 +28,10 @@ export interface EventsQuery {
   fromSeq?: number
 }
 
+/**
+ * Event emitted over Socket.IO as `agent_event` and in run_replay.
+ * Frontend should use: role, eventType, payload (message, characterName, characterEmoji, state, phase).
+ */
 export interface StreamEvent {
   runId: string
   agentRunId: string

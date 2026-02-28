@@ -5,6 +5,7 @@ enum RunStatus {
   awaiting_approval
   completed
   failed
+  cancelled
 }
 
 enum InputType {

@@ -243,14 +243,17 @@ async function appendAndBroadcast(
       agentEmoji: brief.emoji,
       agentRole: brief.role,
       personality: brief.personality,
+      // Frontend-friendly aliases (mock-fe and others use these)
+      characterName: brief.name,
+      characterEmoji: brief.emoji,
     },
     createdAt: event.createdAt,
   }
 
-  // Broadcast to FE via Socket.IO
+  // broadcast to FE via Socket.IO
   app.io.to(`run:${runId}`).emit('agent_event', streamEvent)
 
-  // Also emit state update
+  // emit state update
   if (payload.state) {
     app.io.to(`run:${runId}`).emit('agent_state', {
       runId,
