@@ -1,32 +1,30 @@
 import * as Phaser from "phaser";
 import { MapAgent, type MapAgentConfig } from "./MapAgent";
 
-const TILE_SIZE    = 48;
-const PLAYER_SPEED = 180;
-const PLAYER_SCALE = 2.5;   // 16px × 2.5 = 40px visible
-const FRAME_RATE   = 8;
+const TILE_SIZE = 48;
+const PLAYER_SPEED = 100;
+const JOYSTICK_SPEED_FACTOR = 0.55;
+const PLAYER_SCALE = 2.5;
+const FRAME_RATE = 8;
 
-// Walkable area bounds for agent patrol (cols 2–27, rows 2–17 in pixels)
 const ROOM_BOUNDS = {
-  x1: 2  * TILE_SIZE,
-  y1: 2  * TILE_SIZE,
+  x1: 2 * TILE_SIZE,
+  y1: 2 * TILE_SIZE,
   x2: 27 * TILE_SIZE,
   y2: 17 * TILE_SIZE,
 };
 
-// Bob is the player — Adam, Alex, Amelia, BOB are the 4 map agents
 const AGENT_CONFIGS: Omit<MapAgentConfig, "bounds">[] = [
-  { textureKey: "npc-adam",   name: "Adam",   x: 4  * TILE_SIZE + 24, y: 5  * TILE_SIZE + 24 },
-  { textureKey: "npc-alex",   name: "Alex",   x: 8  * TILE_SIZE + 24, y: 7  * TILE_SIZE + 24 },
-  { textureKey: "npc-amelia", name: "Amelia", x: 14 * TILE_SIZE + 24, y: 5  * TILE_SIZE + 24 },
-  { textureKey: "npc-bob",    name: "BOB",    x: 18 * TILE_SIZE + 24, y: 9  * TILE_SIZE + 24 },
+  { textureKey: "npc-adam", name: "Adam", x: 4 * TILE_SIZE + 24, y: 5 * TILE_SIZE + 24 },
+  { textureKey: "npc-alex", name: "Alex", x: 8 * TILE_SIZE + 24, y: 7 * TILE_SIZE + 24 },
+  { textureKey: "npc-amelia", name: "Amelia", x: 14 * TILE_SIZE + 24, y: 5 * TILE_SIZE + 24 },
+  { textureKey: "npc-bob", name: "BOB", x: 18 * TILE_SIZE + 24, y: 9 * TILE_SIZE + 24 },
 ];
 
-// Direction → frame range mapping (LimeZu _run_16x16.png row 0 layout)
 const PLAYER_ANIM = {
-  down:  { start: 0,  end: 5  },
-  up:    { start: 6,  end: 11 },
-  left:  { start: 12, end: 17 },
+  down: { start: 0, end: 5 },
+  up: { start: 6, end: 11 },
+  left: { start: 12, end: 17 },
   right: { start: 18, end: 23 },
 } as const;
 
@@ -40,37 +38,37 @@ export type PlayerData = {
 };
 
 export class GameScene extends Phaser.Scene {
-  // Input
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasd!: {
-    up:    Phaser.Input.Keyboard.Key;
-    down:  Phaser.Input.Keyboard.Key;
-    left:  Phaser.Input.Keyboard.Key;
+    up: Phaser.Input.Keyboard.Key;
+    down: Phaser.Input.Keyboard.Key;
+    left: Phaser.Input.Keyboard.Key;
     right: Phaser.Input.Keyboard.Key;
   };
 
-  // Local player (Bob)
   private player!: Phaser.Physics.Arcade.Sprite;
   private playerNameTag!: Phaser.GameObjects.Text;
-  private lastDir: Dir = "down";   // remember last direction for idle pose
+  private lastDir: Dir = "down"; // remember last direction for idle pose
 
-  // Remote players — Phase 3 multiplayer
   private otherPlayers: Map<
     string,
     { sprite: Phaser.Physics.Arcade.Sprite; label: Phaser.GameObjects.Text }
   > = new Map();
 
-  // Tilemap layers
   private wallLayer!: Phaser.Tilemaps.TilemapLayer;
   private interiorLayer!: Phaser.Tilemaps.TilemapLayer;
 
-  // Map agents (Adam, Alex, Amelia, BOB)
   private agents: MapAgent[] = [];
 
-  // Bridge callback → React (for coords HUD + socket in Phase 3)
   onPositionChange?: (x: number, y: number) => void;
-  /** When user clicks an agent on the map — name matches agent (e.g. "Adam", "Alex") */
   onAgentInteract?: (agentName: string) => void;
+
+  private joystickVx = 0;
+  private joystickVy = 0;
+  setJoystickInput(nx: number, ny: number) {
+    this.joystickVx = nx;
+    this.joystickVy = ny;
+  }
 
   constructor() {
     super({ key: "GameScene" });
@@ -101,8 +99,8 @@ export class GameScene extends Phaser.Scene {
   private buildTilemap() {
     const map = this.make.tilemap({ key: "map" });
 
-    const roomTiles     = map.addTilesetImage("room-builder", "room-builder")!;
-    const interiorTiles = map.addTilesetImage("interiors",    "interiors")!;
+    const roomTiles = map.addTilesetImage("room-builder", "room-builder")!;
+    const interiorTiles = map.addTilesetImage("interiors", "interiors")!;
 
     const floorLayer = map.createLayer("Floor", roomTiles);
     if (floorLayer) floorLayer.setDepth(0);
@@ -132,10 +130,10 @@ export class GameScene extends Phaser.Scene {
   private registerPlayerAnims() {
     for (const [dir, { start, end }] of Object.entries(PLAYER_ANIM)) {
       this.anims.create({
-        key:       `player-walk-${dir}`,
-        frames:    this.anims.generateFrameNumbers("player", { start, end }),
+        key: `player-walk-${dir}`,
+        frames: this.anims.generateFrameNumbers("player", { start, end }),
         frameRate: FRAME_RATE,
-        repeat:    -1,
+        repeat: -1,
       });
     }
   }
@@ -184,10 +182,7 @@ export class GameScene extends Phaser.Scene {
     // the player regardless of where they stand — including map edges.
     // Without this, Phaser clamps the view to (0,0) when the viewport is
     // larger than the world, pushing the entire map into the top-left corner.
-    this.cameras.main.setBounds(
-      -worldW, -worldH,
-      worldW * 3, worldH * 3,
-    );
+    this.cameras.main.setBounds(-worldW, -worldH, worldW * 3, worldH * 3);
 
     // Smooth lerp follow (0.1 = eases toward player, not instant snap)
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
@@ -200,9 +195,9 @@ export class GameScene extends Phaser.Scene {
     const kb = this.input.keyboard!;
     this.cursors = kb.createCursorKeys();
     this.wasd = {
-      up:    kb.addKey(Phaser.Input.Keyboard.KeyCodes.W),
-      down:  kb.addKey(Phaser.Input.Keyboard.KeyCodes.S),
-      left:  kb.addKey(Phaser.Input.Keyboard.KeyCodes.A),
+      up: kb.addKey(Phaser.Input.Keyboard.KeyCodes.W),
+      down: kb.addKey(Phaser.Input.Keyboard.KeyCodes.S),
+      left: kb.addKey(Phaser.Input.Keyboard.KeyCodes.A),
       right: kb.addKey(Phaser.Input.Keyboard.KeyCodes.D),
     };
 
@@ -222,7 +217,7 @@ export class GameScene extends Phaser.Scene {
 
     // true = capture phase, so we fire before Phaser's bubble-phase listeners
     document.addEventListener("keydown", blockForPhaser, true);
-    document.addEventListener("keyup",   blockForPhaser, true);
+    document.addEventListener("keyup", blockForPhaser, true);
 
     // Stop the player when focus enters a form element
     const onFocusIn = () => {
@@ -237,35 +232,54 @@ export class GameScene extends Phaser.Scene {
 
     // Clean up when this scene shuts down
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      document.removeEventListener("keydown",  blockForPhaser, true);
-      document.removeEventListener("keyup",    blockForPhaser, true);
-      document.removeEventListener("focusin",  onFocusIn);
+      document.removeEventListener("keydown", blockForPhaser, true);
+      document.removeEventListener("keyup", blockForPhaser, true);
+      document.removeEventListener("focusin", onFocusIn);
     });
   }
 
   private handleMovement() {
     const body = this.player.body as Phaser.Physics.Arcade.Body;
 
-    const up    = this.cursors.up.isDown    || this.wasd.up.isDown;
-    const down  = this.cursors.down.isDown  || this.wasd.down.isDown;
-    const left  = this.cursors.left.isDown  || this.wasd.left.isDown;
-    const right = this.cursors.right.isDown || this.wasd.right.isDown;
+    const useJoystick = this.joystickVx !== 0 || this.joystickVy !== 0;
 
     let vx = 0;
     let vy = 0;
     let dir: Dir | null = null;
 
-    // Horizontal takes priority for direction display when moving diagonally
-    if (left)       { vx = -PLAYER_SPEED; dir = "left"; }
-    else if (right) { vx =  PLAYER_SPEED; dir = "right"; }
+    if (useJoystick) {
+      vx = this.joystickVx * PLAYER_SPEED * JOYSTICK_SPEED_FACTOR;
+      vy = this.joystickVy * PLAYER_SPEED * JOYSTICK_SPEED_FACTOR;
+      if (vx !== 0 || vy !== 0) {
+        if (Math.abs(vx) >= Math.abs(vy)) dir = vx > 0 ? "right" : "left";
+        else dir = vy > 0 ? "down" : "up";
+      }
+    } else {
+      const up = this.cursors.up.isDown || this.wasd.up.isDown;
+      const down = this.cursors.down.isDown || this.wasd.down.isDown;
+      const left = this.cursors.left.isDown || this.wasd.left.isDown;
+      const right = this.cursors.right.isDown || this.wasd.right.isDown;
 
-    if (up)         { vy = -PLAYER_SPEED; if (!dir) dir = "up"; }
-    else if (down)  { vy =  PLAYER_SPEED; if (!dir) dir = "down"; }
+      if (left) {
+        vx = -PLAYER_SPEED;
+        dir = "left";
+      } else if (right) {
+        vx = PLAYER_SPEED;
+        dir = "right";
+      }
 
-    // Normalize diagonal speed
-    if (vx !== 0 && vy !== 0) {
-      vx *= 0.707;
-      vy *= 0.707;
+      if (up) {
+        vy = -PLAYER_SPEED;
+        if (!dir) dir = "up";
+      } else if (down) {
+        vy = PLAYER_SPEED;
+        if (!dir) dir = "down";
+      }
+
+      if (vx !== 0 && vy !== 0) {
+        vx *= 0.707;
+        vy *= 0.707;
+      }
     }
 
     body.setVelocity(vx, vy);

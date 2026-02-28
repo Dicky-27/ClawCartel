@@ -1,6 +1,8 @@
 "use client";
 
 import { ChatPanel } from "@/app/_components/chats/ChatPanel";
+import { MobileJoystick } from "@/app/_components/game/MobileJoystick";
+import { useMediaQuery } from "@/app/_hooks/useMediaQuery";
 import type { GameScene } from "@/app/_libs/game/GameScene";
 import { IdeLayout } from "@/app/_components/IdeLayout";
 import { PixelatedLoadingScreen } from "@/app/_components/ui/PixelatedLoadingScreen";
@@ -9,6 +11,9 @@ import type { Agent } from "@/app/_data/agents";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Builder from "../_components/builders/Builder";
+
+/** Show joystick only on mobile viewport (same breakpoint as IdeLayout mobile nav). */
+const MOBILE_VIEWPORT = "(max-width: 767px)";
 const PhaserGame = dynamic(
   () => import("@/app/_components/game/PhaserGame").then((m) => m.PhaserGame),
   { ssr: false, loading: () => <PixelatedLoadingScreen message="Loading world..." /> },
@@ -19,16 +24,19 @@ export default function IdeLayoutPage() {
   const [coords, setCoords] = useState({ x: 0, y: 0 });
   const [agentsPanelOpen, setAgentsPanelOpen] = useState(false);
   const [agentForDialog, setAgentForDialog] = useState<Agent | null>(null);
+  const isMobileViewport = useMediaQuery(MOBILE_VIEWPORT);
 
-  // This fires every time the local player moves in Phaser
   const handlePositionChange = useCallback((x: number, y: number) => {
     setCoords({ x: Math.round(x), y: Math.round(y) });
   }, []);
 
-  // When user clicks an agent on the map, open that agent's dialog
   const handleAgentInteract = useCallback((agentName: string) => {
     const agent = getAgentByName(agentName);
     if (agent) setAgentForDialog(agent);
+  }, []);
+
+  const handleJoystickMove = useCallback((nx: number, ny: number) => {
+    sceneRef.current?.setJoystickInput(nx, -ny);
   }, []);
 
   useEffect(() => {
@@ -68,13 +76,13 @@ export default function IdeLayoutPage() {
         >
           <div className="absolute inset-0">
             <PhaserGame onPositionChange={handlePositionChange} sceneRef={sceneRef} />
-            <div className="absolute top-12 left-1/2 -translate-x-1/2 font-mono text-xs text-white/40">
+            <div className="pointer-events-none absolute top-12 left-1/2 -translate-x-1/2 font-mono text-xs text-white/40">
               {coords.x}, {coords.y}
             </div>
+            <MobileJoystick enabled={isMobileViewport} onMove={handleJoystickMove} />
           </div>
         </IdeLayout>
       </div>
     </div>
   );
 }
-

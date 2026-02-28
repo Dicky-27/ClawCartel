@@ -33,6 +33,7 @@
     "motion": "^12.34.0",
     "next": "16.1.6",
     "next-themes": "^0.4.6",
+    "nipplejs": "^0.10.2",
     "phaser": "^3.90.0",
     "react": "19.2.3",
     "react-day-picker": "^9.13.2",
