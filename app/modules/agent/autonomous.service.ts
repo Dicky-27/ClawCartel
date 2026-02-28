@@ -1,15 +1,12 @@
 /**
- * Multi-Round Autonomous Discussion
+ * Multi-Round Autonomous Discussion + Code Generation
  *
- * PM orchestrates a real conversation with multiple rounds:
- * - Round 1: All agents share initial thoughts
- * - Round 2: Agents respond to each other (debate/converge)
- * - Round 3: PM asks follow-up questions
- * - Final: PM synthesizes decision
+ * PM orchestrates a real conversation with multiple rounds, then agents write actual code files.
  */
 
 import { FastifyInstance } from 'fastify'
 import { OpenClawGatewayClient } from '#app/modules/agent/openclaw.gateway'
+import { fileSystem } from '#app/modules/agent/file-system.service'
 import runService from '#app/modules/run/run.service'
 import Logger from '#app/utils/logger'
 import {
@@ -32,12 +29,6 @@ const ROLE_AGENT_MAP: Record<AgentRole, string> = {
   bd_research: 'bd-research-agent',
 }
 
-const OPENCLAW_ENABLED = (process.env.OPENCLAW_AGENT_ENABLED ?? 'true') === 'true'
-
-// Discussion config
-const MAX_ROUNDS = 3
-const MIN_ROUNDS = 2
-
 // Agent briefs
 const AGENT_BRIEFS: Record<AgentRole, {
   name: string
@@ -55,13 +46,7 @@ PERSONALITY: Direct, decisive, slightly impatient but fair. Hates wasted time.
 SPEAKING STYLE: Short punchy sentences. Gets to the point.
 QUIRK: Always watching the clock. Says "Let's wrap this up" frequently.
 
-Your job: Lead squad discussions. Don't just collect opinions - push for deeper analysis.
-
-STRATEGY:
-- Round 1: Ask each agent for initial thoughts
-- Round 2: Challenge them to respond to EACH OTHER (not just you)
-- Round 3: Ask follow-up questions on specific points
-- Keep agents engaged in real discussion, not just reporting`,
+Your job: Lead squad discussions and coordinate code generation.`,
   },
   // eslint-disable-next-line camelcase
   bd_research: {
@@ -74,13 +59,7 @@ PERSONALITY: Data-driven, curious, skeptical.
 SPEAKING STYLE: References numbers and real competitors.
 QUIRK: "Actually, the data shows..."
 
-When discussing:
-- Question assumptions with data
-- Respond to technical points from FE/BE
-- Challenge market viability claims
-- Suggest partnerships based on gaps you see
-
-Don't just report - ENGAGE in the debate.`,
+During development: Write market research docs and project documentation.`,
   },
   fe: {
     name: 'FE',
@@ -92,13 +71,8 @@ PERSONALITY: Creative, visual thinker, enthusiastic.
 SPEAKING STYLE: Visual descriptions, component thinking.
 QUIRK: Sees everything as React components.
 
-When discussing:
-- Push back on unrealistic timelines from PM
-- Ask BE about API constraints before designing
-- Question Researcher if user data contradicts your UX assumptions
-- Defend design decisions with user experience arguments
-
-Don't just describe - DEBATE with your squad.`,
+During development: Write actual React/Vue components, CSS, and frontend code.
+Always provide complete, working code with proper imports and exports.`,
   },
   // eslint-disable-next-line camelcase
   be_sc: {
@@ -111,13 +85,8 @@ PERSONALITY: Technical, precise, security-obsessed.
 SPEAKING STYLE: Technical but concise.
 QUIRK: "What if it fails?" Gas cost obsession.
 
-When discussing:
-- Challenge FE if UI demands are too complex
-- Question Researcher's market assumptions with technical feasibility
-- Push back on PM timelines if security needs more time
-- Flag when other agents underestimate complexity
-
-Don't just explain - ARGUE for technical correctness.`,
+During development: Write API routes, database models, and smart contracts.
+Always provide complete, working code with proper error handling.`,
   },
 }
 
@@ -127,80 +96,11 @@ const activeDiscussions = new Map<string, {
   messages: Array<{ role: AgentRole; name: string; content: string }>
   isComplete: boolean
   waitingForUser: boolean
+  projectName: string
 }>()
 
-// Delay helper for realistic pacing
+// Delay helper
 const delay = (ms: number) => new Promise(r => setTimeout(r, ms))
-
-/**
- * Stream agent response with realistic pacing
- */
-async function streamAgentResponse(
-  app: FastifyInstance,
-  runId: string,
-  agentRun: AgentRun | null,
-  role: AgentRole,
-  prompt: string,
-  context: string
-): Promise<string> {
-  const gateway = new OpenClawGatewayClient()
-  const brief = AGENT_BRIEFS[role]
-
-  // Simulate "thinking" delay
-  await delay(1000 + Math.random() * 2000)
-
-  const fullPrompt = `${brief.systemPrompt}
-
-=== CONVERSATION CONTEXT ===
-${context}
-
-=== YOUR TURN ===
-${prompt}
-
-Respond as ${brief.name} in your natural voice. Be substantive (3-5 sentences minimum). Engage with what others said.`
-
-  Logger.info({ runId, agent: brief.name, round: activeDiscussions.get(runId)?.round }, 'Agent responding')
-
-  broadcast(app, runId, role, 'agent.started', {
-    message: `${brief.name} is typing...`,
-    agentName: brief.name,
-    agentEmoji: brief.emoji,
-  })
-
-  const stream = gateway.streamAgentResponse(
-    ROLE_AGENT_MAP[role],
-    fullPrompt,
-    `${runId}:${role}:${Date.now()}`
-  )
-
-  let fullText = ''
-
-  for await (const chunk of stream) {
-    if (chunk.done) break
-    if (chunk.content) {
-      fullText += chunk.content
-
-      // Stream with slight delay for typing effect
-      broadcast(app, runId, role, 'agent.delta', {
-        message: chunk.content,
-        accumulated: fullText,
-        agentName: brief.name,
-        agentEmoji: brief.emoji,
-      })
-    }
-  }
-
-  broadcast(app, runId, role, 'agent.done', {
-    message: fullText,
-    agentName: brief.name,
-    agentEmoji: brief.emoji,
-  })
-
-  // Pause after response for readability
-  await delay(500)
-
-  return fullText
-}
 
 /**
  * Broadcast event to frontend
@@ -239,6 +139,119 @@ function buildContext(messages: Array<{ role: AgentRole; name: string; content: 
 }
 
 /**
+ * Stream agent response with file writing capability
+ */
+async function streamAgentResponse(
+  app: FastifyInstance,
+  runId: string,
+  agentRun: AgentRun | null,
+  role: AgentRole,
+  prompt: string,
+  context: string,
+  fileWrites?: Array<{ path: string; description: string }>
+): Promise<string> {
+  const gateway = new OpenClawGatewayClient()
+  const brief = AGENT_BRIEFS[role]
+
+  // Simulate "thinking" delay
+  await delay(1000 + Math.random() * 2000)
+
+  let fileInstructions = ''
+  if (fileWrites && fileWrites.length > 0) {
+    fileInstructions = `\n\n=== FILE GENERATION TASK ===\nYou MUST write the following files:\n${fileWrites.map(f => `- ${f.path}: ${f.description}`).join('\n')}\n\nFor each file, output in this format:\n===FILE:filepath===\n<file content here>\n===ENDFILE===\n\nProvide complete, production-ready code.`
+  }
+
+  const fullPrompt = `${brief.systemPrompt}
+
+=== CONVERSATION CONTEXT ===
+${context}
+
+=== YOUR TURN ===
+${prompt}${fileInstructions}
+
+Respond as ${brief.name} in your natural voice.`
+
+  Logger.info({ runId, agent: brief.name }, 'Agent responding')
+
+  broadcast(app, runId, role, 'agent.started', {
+    message: `${brief.name} is typing...`,
+    agentName: brief.name,
+    agentEmoji: brief.emoji,
+  })
+
+  const stream = gateway.streamAgentResponse(
+    ROLE_AGENT_MAP[role],
+    fullPrompt,
+    `${runId}:${role}:${Date.now()}`
+  )
+
+  let fullText = ''
+
+  for await (const chunk of stream) {
+    if (chunk.done) break
+    if (chunk.content) {
+      fullText += chunk.content
+
+      broadcast(app, runId, role, 'agent.delta', {
+        message: chunk.content,
+        accumulated: fullText,
+        agentName: brief.name,
+        agentEmoji: brief.emoji,
+      })
+    }
+  }
+
+  broadcast(app, runId, role, 'agent.done', {
+    message: fullText,
+    agentName: brief.name,
+    agentEmoji: brief.emoji,
+  })
+
+  // Extract and write files if specified
+  if (fileWrites && fileWrites.length > 0) {
+    await extractAndWriteFiles(app, runId, fullText, brief.name)
+  }
+
+  await delay(500)
+
+  return fullText
+}
+
+/**
+ * Extract file blocks from agent response and write to disk
+ */
+async function extractAndWriteFiles(
+  app: FastifyInstance,
+  runId: string,
+  content: string,
+  agentName: string
+): Promise<void> {
+  const fileBlockRegex = /===FILE:([^=]+)===\n([\s\S]*?)===ENDFILE===/g
+  let match: RegExpExecArray | null
+
+  while ((match = fileBlockRegex.exec(content)) !== null) {
+    const filePath = match[1].trim()
+    const fileContent = match[2].trim()
+
+    try {
+      const event = await fileSystem.writeFile(runId, filePath, fileContent, agentName)
+
+      // Broadcast file creation event
+      broadcast(app, runId, 'pm', 'agent.delta', {
+        message: `📁 Created: ${filePath}`,
+        phase: 'file_created',
+        fileEvent: event,
+        agentName,
+      })
+
+      Logger.info({ runId, filePath, agent: agentName }, 'File created')
+    } catch (error) {
+      Logger.error({ runId, filePath, error }, 'Failed to write file')
+    }
+  }
+}
+
+/**
  * Multi-round autonomous discussion
  */
 async function processMultiRoundDiscussion(
@@ -247,7 +260,9 @@ async function processMultiRoundDiscussion(
   inputText: string
 ): Promise<void> {
   const runId = run.id
-  Logger.info({ runId }, 'Starting MULTI-ROUND autonomous discussion')
+  const projectName = inputText.slice(0, 50).replace(/[^a-zA-Z0-9]/g, '_')
+
+  Logger.info({ runId, projectName }, 'Starting MULTI-ROUND autonomous discussion')
 
   // Initialize discussion
   const discussion = {
@@ -255,19 +270,19 @@ async function processMultiRoundDiscussion(
     messages: [] as Array<{ role: AgentRole; name: string; content: string }>,
     isComplete: false,
     waitingForUser: false,
+    projectName,
   }
   activeDiscussions.set(runId, discussion)
 
   await runService.updateRun(run.id, { status: 'executing' })
 
-  // ROUND 1: Initial thoughts from all agents
+  // ROUND 1: Initial thoughts
   Logger.info({ runId, round: 1 }, 'ROUND 1: Initial thoughts')
   broadcast(app, runId, 'pm', 'agent.started', {
     message: 'Starting multi-round discussion',
     phase: 'round_1',
   })
 
-  // PM kicks off
   const pmOpening = await streamAgentResponse(
     app, runId, null, 'pm',
     `Kick off this discussion about: "${inputText}"\n\nIntroduce the project and ask Researcher for market perspective first.`,
@@ -275,130 +290,84 @@ async function processMultiRoundDiscussion(
   )
   discussion.messages.push({ role: 'pm', name: 'PM', content: pmOpening })
 
-  // Researcher responds
-  const researcherR1 = await streamAgentResponse(
-    app, runId, null, 'bd_research',
-    'Share your market analysis and competitor research.',
-    buildContext(discussion.messages)
-  )
-  discussion.messages.push({ role: 'bd_research', name: 'Researcher', content: researcherR1 })
+  for (const role of ['bd_research', 'fe', 'be_sc'] as AgentRole[]) {
+    const brief = AGENT_BRIEFS[role]
+    const response = await streamAgentResponse(
+      app, runId, null, role,
+      'Share your initial thoughts on this project.',
+      buildContext(discussion.messages)
+    )
+    discussion.messages.push({ role, name: brief.name, content: response })
+  }
 
-  // FE responds
-  const feR1 = await streamAgentResponse(
-    app, runId, null, 'fe',
-    'Share your UI/UX approach and any concerns about the market data.',
-    buildContext(discussion.messages)
-  )
-  discussion.messages.push({ role: 'fe', name: 'FE', content: feR1 })
-
-  // BE_SC responds
-  const beR1 = await streamAgentResponse(
-    app, runId, null, 'be_sc',
-    'Share your technical architecture thoughts and challenge any unrealistic assumptions.',
-    buildContext(discussion.messages)
-  )
-  discussion.messages.push({ role: 'be_sc', name: 'BE_SC', content: beR1 })
-
-  // ROUND 2: Agents respond to EACH OTHER (debate)
+  // ROUND 2: Debate
   discussion.round = 2
-  Logger.info({ runId, round: 2 }, 'ROUND 2: Debate and convergence')
-  broadcast(app, runId, 'pm', 'agent.delta', {
-    message: '\n[Round 2: Debate and responses]',
-    phase: 'round_2',
-  })
+  broadcast(app, runId, 'pm', 'agent.delta', { message: '\n[Round 2: Debate]', phase: 'round_2' })
 
-  // PM challenges and asks follow-ups
   const pmR2 = await streamAgentResponse(
     app, runId, null, 'pm',
-    'You heard from everyone. Now:\n1. Challenge FE on their timeline estimate\n2. Ask BE_SC to respond to Researcher\'s market concerns\n3. Push for specific commitments',
+    'Challenge the team. Ask FE about timeline. Ask BE_SC to respond to Researcher\'s market concerns.',
     buildContext(discussion.messages)
   )
   discussion.messages.push({ role: 'pm', name: 'PM', content: pmR2 })
 
-  // Researcher responds to technical points
-  const researcherR2 = await streamAgentResponse(
-    app, runId, null, 'bd_research',
-    'Respond to BE_SC\'s technical concerns. Do you agree with the market feasibility? Challenge FE if their UI seems too complex.',
-    buildContext(discussion.messages)
-  )
-  discussion.messages.push({ role: 'bd_research', name: 'Researcher', content: researcherR2 })
+  for (const role of ['bd_research', 'fe', 'be_sc'] as AgentRole[]) {
+    const brief = AGENT_BRIEFS[role]
+    const response = await streamAgentResponse(
+      app, runId, null, role,
+      'Respond to the challenges. Defend your position or concede points.',
+      buildContext(discussion.messages)
+    )
+    discussion.messages.push({ role, name: brief.name, content: response })
+  }
 
-  // FE defends and adjusts
-  const feR2 = await streamAgentResponse(
-    app, runId, null, 'fe',
-    'Defend your design decisions or concede points. Respond to PM\'s timeline challenge. Ask BE about API constraints.',
-    buildContext(discussion.messages)
-  )
-  discussion.messages.push({ role: 'fe', name: 'FE', content: feR2 })
-
-  // BE_SC pushes back or agrees
-  const beR2 = await streamAgentResponse(
-    app, runId, null, 'be_sc',
-    'Respond to FE\'s API questions. Agree or disagree with Researcher\'s feasibility. Push back on PM if timeline is unrealistic.',
-    buildContext(discussion.messages)
-  )
-  discussion.messages.push({ role: 'be_sc', name: 'BE_SC', content: beR2 })
-
-  // ROUND 3: Final positions and convergence
+  // ROUND 3: Final positions
   discussion.round = 3
-  Logger.info({ runId, round: 3 }, 'ROUND 3: Final positions')
-  broadcast(app, runId, 'pm', 'agent.delta', {
-    message: '\n[Round 3: Final positions]',
-    phase: 'round_3',
-  })
+  broadcast(app, runId, 'pm', 'agent.delta', { message: '\n[Round 3: Final Positions]', phase: 'round_3' })
 
-  // PM asks for final positions
   const pmR3 = await streamAgentResponse(
     app, runId, null, 'pm',
-    'Time to wrap up. Ask each agent for their FINAL position and any non-negotiables.',
+    'Ask each agent for their FINAL position and non-negotiables.',
     buildContext(discussion.messages)
   )
   discussion.messages.push({ role: 'pm', name: 'PM', content: pmR3 })
 
-  // Each agent gives final word
   for (const role of ['bd_research', 'fe', 'be_sc'] as AgentRole[]) {
     const brief = AGENT_BRIEFS[role]
-    const finalResponse = await streamAgentResponse(
+    const response = await streamAgentResponse(
       app, runId, null, role,
-      'Give your FINAL position. What\'s your bottom line? Any non-negotiables?',
+      'Give your FINAL position. Bottom line?',
       buildContext(discussion.messages)
     )
-    discussion.messages.push({ role, name: brief.name, content: finalResponse })
+    discussion.messages.push({ role, name: brief.name, content: response })
   }
 
   // PM Final Decision
-  Logger.info({ runId }, 'PM synthesizing final decision')
-  broadcast(app, runId, 'pm', 'agent.delta', {
-    message: '\n[Final Decision]',
-    phase: 'final',
-  })
-
   const pmFinal = await streamAgentResponse(
     app, runId, null, 'pm',
-    'Synthesize the entire discussion. What did we agree on? What are the key decisions?\n\nEnd with "FINAL DECISION:" summary and "ACTION ITEMS:" for each role.',
+    'Synthesize the discussion. What did we agree on? Provide FINAL DECISION and ACTION ITEMS for each role.',
     buildContext(discussion.messages)
   )
   discussion.messages.push({ role: 'pm', name: 'PM', content: pmFinal })
 
-  // Mark discussion complete but waiting for user
+  // Mark complete
   discussion.isComplete = true
   discussion.waitingForUser = true
 
-  // Broadcast completion with action items
   await runService.updateRun(run.id, { status: 'awaiting_approval' })
   broadcast(app, runId, 'pm', 'run.done', {
-    message: 'Discussion complete - Awaiting your approval to proceed',
+    message: 'Discussion complete - Ready to build',
     phase: 'awaiting_approval',
     discussionSummary: discussion.messages,
     pmFinalDecision: pmFinal,
-    actionItems: 'Extracted from PM final response',
+    projectName: discussion.projectName,
   })
 
-  Logger.info({ runId, messageCount: discussion.messages.length }, 'Multi-round discussion complete, waiting for user')
+  Logger.info({ runId, messageCount: discussion.messages.length }, 'Discussion complete, waiting for user')
 }
 
 /**
- * Continue to development phase after user approval
+ * Continue to development - CODE GENERATION PHASE
  */
 export async function continueToDevelopment(
   app: FastifyInstance,
@@ -412,7 +381,7 @@ export async function continueToDevelopment(
 
   if (!approved) {
     broadcast(app, runId, 'pm', 'run.done', {
-      message: 'User rejected the plan. Discussion ended.',
+      message: 'User rejected the plan.',
       phase: 'rejected',
     })
     await runService.updateRun(runId, { status: 'cancelled' })
@@ -421,85 +390,118 @@ export async function continueToDevelopment(
     return
   }
 
-  // Start development phase
-  Logger.info({ runId }, 'Starting DEVELOPMENT phase')
+  // Start CODE GENERATION
+  Logger.info({ runId }, '=== STARTING CODE GENERATION ===')
   discussion.waitingForUser = false
   await runService.updateRun(runId, { status: 'executing' })
 
+  // Initialize project structure
   broadcast(app, runId, 'pm', 'agent.started', {
-    message: 'Development phase starting',
-    phase: 'development',
+    message: '🚀 Initializing project workspace...',
+    phase: 'code_generation',
   })
 
-  // DEVELOPMENT ROUNDS
-  // Each agent creates their deliverables
+  await fileSystem.initProject(runId, discussion.projectName)
 
-  // Phase 1: Researcher creates market report
+  // PHASE 1: Researcher - Project Documentation
   broadcast(app, runId, 'pm', 'agent.delta', {
-    message: '\n[Phase 1: Market Research Report]',
-    phase: 'development_research',
+    message: '\n[Phase 1/4: Researcher - Project Documentation]',
+    phase: 'phase_1_docs',
   })
 
-  const researchReport = await streamAgentResponse(
+  const researchFiles = [
+    { path: 'research/market-analysis.md', description: 'Market analysis with size, trends, competitors' },
+    { path: 'research/competitor-report.md', description: 'Top 5 competitors analysis' },
+    { path: 'docs/project-requirements.md', description: 'Project requirements based on discussion' },
+  ]
+
+  await streamAgentResponse(
     app, runId, null, 'bd_research',
-    'Create a detailed market research report. Include: market size, top 5 competitors, partnership opportunities, regulatory concerns. Format as a professional report.',
-    buildContext(discussion.messages)
+    `Create project documentation based on our discussion:\n\n${buildContext(discussion.messages)}`,
+    '',
+    researchFiles
   )
 
-  // Phase 2: FE creates UI specs
+  // PHASE 2: BE_SC - Backend & Smart Contracts
   broadcast(app, runId, 'pm', 'agent.delta', {
-    message: '\n[Phase 2: UI/UX Specifications]',
-    phase: 'development_ui',
+    message: '\n[Phase 2/4: BE_SC - Backend Architecture]',
+    phase: 'phase_2_backend',
   })
 
-  const uiSpecs = await streamAgentResponse(
-    app, runId, null, 'fe',
-    'Create detailed UI/UX specifications. Include: component list, page flows, animation specs, responsive breakpoints, suggested libraries. Format as design specs.',
-    buildContext([...discussion.messages, { role: 'bd_research', name: 'Researcher', content: researchReport }])
-  )
+  const backendFiles = [
+    { path: 'backend/package.json', description: 'Node.js dependencies (express, prisma, etc)' },
+    { path: 'backend/src/api/routes.ts', description: 'Main API routes' },
+    { path: 'backend/src/models/schema.prisma', description: 'Database schema' },
+    { path: 'backend/src/contracts/main.sol', description: 'Solidity smart contract (if needed)' },
+    { path: 'backend/README.md', description: 'Backend setup instructions' },
+  ]
 
-  // Phase 3: BE_SC creates tech specs
-  broadcast(app, runId, 'pm', 'agent.delta', {
-    message: '\n[Phase 3: Technical Architecture]',
-    phase: 'development_tech',
-  })
-
-  const techSpecs = await streamAgentResponse(
+  await streamAgentResponse(
     app, runId, null, 'be_sc',
-    'Create technical architecture documentation. Include: API design, database schema, smart contract structure, security considerations, deployment steps. Format as technical spec.',
-    buildContext([...discussion.messages,
-      { role: 'bd_research', name: 'Researcher', content: researchReport },
-      { role: 'fe', name: 'FE', content: uiSpecs }
-    ])
+    `Create the complete backend based on project requirements.\n\nContext:\n${buildContext(discussion.messages)}`,
+    '',
+    backendFiles
   )
 
-  // PM creates final project plan
+  // PHASE 3: FE - Frontend Application
   broadcast(app, runId, 'pm', 'agent.delta', {
-    message: '\n[Phase 4: Project Roadmap]',
-    phase: 'development_roadmap',
+    message: '\n[Phase 3/4: FE - Frontend Application]',
+    phase: 'phase_3_frontend',
   })
 
-  const projectPlan = await streamAgentResponse(
-    app, runId, null, 'pm',
-    `Create a comprehensive project roadmap based on:\n\nResearch Report: ${researchReport.slice(0, 500)}...\n\nUI Specs: ${uiSpecs.slice(0, 500)}...\n\nTech Specs: ${techSpecs.slice(0, 500)}...\n\nInclude: milestones, timeline, resource allocation, risk mitigation.`,
-    buildContext(discussion.messages)
+  const frontendFiles = [
+    { path: 'frontend/package.json', description: 'React/Vue dependencies' },
+    { path: 'frontend/src/App.tsx', description: 'Main App component' },
+    { path: 'frontend/src/components/Layout.tsx', description: 'Layout component with navigation' },
+    { path: 'frontend/src/pages/Home.tsx', description: 'Home page component' },
+    { path: 'frontend/src/hooks/useApi.ts', description: 'API hook for backend calls' },
+    { path: 'frontend/src/index.css', description: 'Global styles' },
+    { path: 'frontend/README.md', description: 'Frontend setup instructions' },
+  ]
+
+  await streamAgentResponse(
+    app, runId, null, 'fe',
+    `Create the complete frontend application. Use modern React with TypeScript.\n\nContext:\n${buildContext(discussion.messages)}`,
+    '',
+    frontendFiles
   )
+
+  // PHASE 4: PM - Deployment & Integration
+  broadcast(app, runId, 'pm', 'agent.delta', {
+    message: '\n[Phase 4/4: PM - Deployment Configuration]',
+    phase: 'phase_4_deploy',
+  })
+
+  const deployFiles = [
+    { path: 'deployment/docker-compose.yml', description: 'Docker compose for full stack' },
+    { path: 'deployment/deploy.sh', description: 'Deployment script' },
+    { path: 'docs/ARCHITECTURE.md', description: 'System architecture diagram and docs' },
+    { path: 'docs/GETTING_STARTED.md', description: 'How to run the project locally' },
+  ]
+
+  await streamAgentResponse(
+    app, runId, null, 'pm',
+    'Create deployment configuration and final documentation.',
+    '',
+    deployFiles
+  )
+
+  // Get final stats
+  const stats = await fileSystem.getStats(runId)
+  const fileList = await fileSystem.getAllFiles(runId)
 
   // Complete
   await runService.updateRun(runId, { status: 'completed' })
   broadcast(app, runId, 'pm', 'run.done', {
-    message: 'Development phase complete - All deliverables ready',
+    message: `✅ Code generation complete! ${stats.totalFiles} files created.`,
     phase: 'completed',
-    deliverables: {
-      marketResearch: researchReport,
-      uiSpecs: uiSpecs,
-      techSpecs: techSpecs,
-      projectPlan: projectPlan,
-    },
+    stats,
+    fileList,
+    downloadUrl: `/v1/autonomous/runs/${runId}/download`,
   })
 
+  Logger.info({ runId, files: stats.totalFiles }, 'Code generation complete')
   activeDiscussions.delete(runId)
-  Logger.info({ runId }, 'Development phase complete')
 }
 
 /**
@@ -545,6 +547,9 @@ const AutonomousAgentService = {
 
   continueToDevelopment,
   getDiscussion: (runId: string) => activeDiscussions.get(runId),
+  fileSystem,
 }
+
+export { fileSystem }
 
 export default AutonomousAgentService
