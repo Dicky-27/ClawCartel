@@ -10,11 +10,8 @@ const PIXEL_COUNT = PIXEL_GRID_COLS * PIXEL_GRID_ROWS;
 const BAR_BLOCKS = 16;
 
 export interface PixelatedLoadingScreenProps {
-  /** Message under the pixel grid, e.g. "Loading..." or "Loading world..." */
   message?: string;
-  /** Optional className for the root container */
   className?: string;
-  /** Show subtle scanline overlay (default true) */
   scanline?: boolean;
 }
 
@@ -35,7 +32,6 @@ export function PixelatedLoadingScreen({
       aria-live="polite"
       aria-label={message}
     >
-      {/* Subtle scanline overlay for pixel/retro feel */}
       {scanline && (
         <div
           className="pointer-events-none absolute inset-0 opacity-[0.05]"
@@ -52,7 +48,6 @@ export function PixelatedLoadingScreen({
         />
       )}
 
-      {/* Pixel grid — wave: cells pop in sequence by row/col */}
       <div
         className="grid gap-0.5"
         style={{
@@ -78,7 +73,6 @@ export function PixelatedLoadingScreen({
         })}
       </div>
 
-      {/* Pixel-style progress bar (chunky blocks) */}
       <div className="flex gap-0.5">
         {Array.from({ length: BAR_BLOCKS }, (_, i) => (
           <div

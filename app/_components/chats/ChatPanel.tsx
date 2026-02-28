@@ -8,7 +8,11 @@ import { Textarea } from "@/app/_components/ui/textarea";
 import { useSocketChat } from "@/app/_hooks/useSocketChat";
 import { useSolana } from "@/app/_providers/SolanaProvider";
 import { cn, getSolanaColorById, truncateId } from "@/app/_libs/utils";
-import { MessageSquareIcon, Paperclip, SendIcon, WalletIcon } from "lucide-react";
+import { BotIcon, MessageSquareIcon, Paperclip, SendIcon, WalletIcon } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/app/_components/ui/popover";
+import { AgentDialog } from "@/app/_components/agents/AgentDialog";
+import { AGENTS, getAgentById } from "@/app/_data/agents";
+import type { Agent } from "@/app/_data/agents";
 
 export interface ChatMessage {
   id: string;
@@ -18,57 +22,41 @@ export interface ChatMessage {
   role?: "user" | "assistant";
 }
 
-/** Dummy */
+
 export const DUMMY_CHAT_MESSAGES: ChatMessage[] = [
   {
     id: "1",
-    senderId: "alice",
-    senderName: "Alice",
-    content: "Hey, did you get the design specs?",
+    senderId: "adam",
+    senderName: "Adam",
+    content: "Let's align on the strategy before we build.",
   },
   {
     id: "2",
-    senderId: "bob",
-    senderName: "Bob",
-    content: "Yes, just finished the review. Looks good to me.",
+    senderId: "alex",
+    senderName: "Alex",
+    content: "What if we tried a quick prototype first?",
   },
   {
     id: "3",
-    senderId: "carol",
-    senderName: "Carol",
-    content: "Can we ship the auth changes this week?",
+    senderId: "amelia",
+    senderName: "Amelia",
+    content: "I'll document the flow and edge cases.",
   },
   {
     id: "4",
-    senderId: "alice",
-    senderName: "Alice",
-    content: "I’d say Monday if QA is done by Friday.",
-  },
-  {
-    id: "5",
-    senderId: "dave",
-    senderName: "Dave",
-    content: "I’ll run the E2E suite tonight and report back.",
-  },
-  {
-    id: "6",
     senderId: "bob",
-    senderName: "Bob",
-    content: "Thanks Dave. Carol — can you update the docs?",
+    senderName: "BOB",
+    content: "Ship it and we can fix in prod if needed.",
   },
-  { id: "7", senderId: "carol", senderName: "Carol", content: "On it. I’ll push a draft by EOD." },
+  { id: "5", senderId: "adam", senderName: "Adam", content: "Risk is low if we scope to v1 only." },
+  { id: "6", senderId: "alex", senderName: "Alex", content: "I'll have a demo by EOD." },
   {
-    id: "8",
-    senderId: "eve",
-    senderName: "Eve",
-    content: "New here — where do we log deployment issues?",
+    id: "7",
+    senderId: "amelia",
+    senderName: "Amelia",
+    content: "QA checklist is ready. Who runs it?",
   },
-  {
-    id: "9",
-    senderId: "alice",
-    senderName: "Alice",
-    content: "We use #deploys in Slack. I’ll add you to the channel.",
-  },
+  { id: "8", senderId: "bob", senderName: "BOB", content: "I'll run the E2E suite tonight." },
 ];
 
 export interface ChatPanelProps {
@@ -78,6 +66,57 @@ export interface ChatPanelProps {
   roomId?: string;
   initialMessages?: ChatMessage[];
   onSend?: (message: string) => void;
+  agentsPanelOpen?: boolean;
+  onAgentsPanelOpenChange?: (open: boolean) => void;
+  /** When set, opens the agent dialog (e.g. after clicking map or avatar) */
+  agentForDialog?: Agent | null;
+  onAgentDialogChange?: (agent: Agent | null) => void;
+  agentIds?: string[];
+}
+
+const DEFAULT_AGENT_IDS = ["adam", "alex", "amelia", "bob"];
+
+const AVATAR_HOVER =
+  "group inline-flex shrink-0 rounded-full p-0.5 ring-2 ring-transparent transition-transform hover:scale-[1.06] hover:ring-primary focus-visible:scale-[1.06] focus-visible:ring-primary focus-visible:outline-none";
+
+function AgentsPopoverContent({
+  onSelectAgent,
+  onClose,
+}: {
+  onSelectAgent: (agent: Agent) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="flex flex-col gap-3 p-3">
+      <p className="text-muted-foreground text-xs">
+        Click an avatar to read about that agent.
+      </p>
+      <div className="flex flex-wrap gap-3">
+        {AGENTS.map((agent) => (
+          <button
+            key={agent.id}
+            type="button"
+            onClick={() => {
+              onSelectAgent(agent);
+              onClose();
+            }}
+            className={AVATAR_HOVER}
+            aria-label={`About ${agent.name}`}
+          >
+            <PixelAvatar
+              id={agent.id}
+              size={40}
+              title={agent.name}
+              className=""
+            />
+          </button>
+        ))}
+      </div>
+      <Button variant="ghost" size="sm" className="w-full text-xs" onClick={onClose}>
+        Close
+      </Button>
+    </div>
+  );
 }
 
 export function ChatPanel({
@@ -86,19 +125,35 @@ export function ChatPanel({
   roomId = "global",
   initialMessages = [],
   onSend,
+  agentsPanelOpen,
+  onAgentsPanelOpenChange,
+  agentForDialog: agentForDialogProp,
+  onAgentDialogChange,
+  agentIds = DEFAULT_AGENT_IDS,
 }: ChatPanelProps) {
-  const { isConnected: isWalletConnected, setOpen: setWalletOpen, selectedAccount, selectedWallet } =
-    useSolana();
+  const {
+    isConnected: isWalletConnected,
+    setOpen: setWalletOpen,
+    selectedAccount,
+    selectedWallet,
+  } = useSolana();
   const socketChat = useSocketChat({
     roomId,
     senderId: selectedAccount?.address ?? null,
-    senderName: selectedWallet?.name ?? (selectedAccount ? truncateId(selectedAccount.address) : null),
+    senderName:
+      selectedWallet?.name ?? (selectedAccount ? truncateId(selectedAccount.address) : null),
     initialMessages: isWalletConnected ? [] : initialMessages,
   });
   const messages = isWalletConnected ? socketChat.messages : initialMessages;
   const sendMessage = isWalletConnected ? socketChat.sendMessage : undefined;
   const [input, setInput] = React.useState("");
   const scrollRef = React.useRef<HTMLDivElement>(null);
+  const [internalAgentsOpen, setInternalAgentsOpen] = React.useState(false);
+  const agentsOpen = agentsPanelOpen ?? internalAgentsOpen;
+  const setAgentsOpen = onAgentsPanelOpenChange ?? setInternalAgentsOpen;
+  const [internalAgentForDialog, setInternalAgentForDialog] = React.useState<Agent | null>(null);
+  const agentForDialog = agentForDialogProp ?? internalAgentForDialog;
+  const setAgentForDialog = onAgentDialogChange ?? setInternalAgentForDialog;
 
   const handleSend = () => {
     if (!isWalletConnected) return;
@@ -128,8 +183,28 @@ export function ChatPanel({
     }
   };
 
+  const isAgentId = (id: string) => agentIds.includes(id);
+
   return (
     <div className={cn("bg-background flex h-full flex-col", className)}>
+      <div className="border-border/50 flex items-center justify-between border-b px-3 py-2 pr-10">
+        <span className="text-xs font-bold">Chat</span>
+        <Popover open={agentsOpen} onOpenChange={setAgentsOpen}>
+          <PopoverTrigger
+            className="hover:bg-accent hover:text-accent-foreground inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-xs"
+            aria-label="View agents"
+          >
+            <BotIcon className="size-3.5" />
+            Agents
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-64 p-0" side="bottom">
+            <AgentsPopoverContent
+              onSelectAgent={(agent) => setAgentForDialog(agent)}
+              onClose={() => setAgentsOpen(false)}
+            />
+          </PopoverContent>
+        </Popover>
+      </div>
       {/* Messages */}
       <ScrollArea className="min-h-0 flex-1">
         <div className="flex flex-col gap-3 p-3">
@@ -146,19 +221,37 @@ export function ChatPanel({
           ) : (
             messages.map((m) => {
               const { bg } = getSolanaColorById(m.senderId);
-              const isUser = m.role === "user" || m.senderId === "user" || m.senderId === currentUserId;
+              const isUser =
+                m.role === "user" || m.senderId === "user" || m.senderId === currentUserId;
               const label = isUser ? "You" : (m.senderName ?? truncateId(m.senderId));
+              const avatar = (
+                <PixelAvatar
+                  id={m.senderId}
+                  size={36}
+                  title={m.senderName ?? m.senderId}
+                  className="shrink-0"
+                />
+              );
               return (
                 <div
                   key={m.id}
                   className={cn("flex items-start gap-3", isUser && "flex-row-reverse")}
                 >
-                  <PixelAvatar
-                    id={m.senderId}
-                    size={36}
-                    title={m.senderName ?? m.senderId}
-                    className="ring-background shrink-0 ring-2"
-                  />
+                  {isAgentId(m.senderId) ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const agent = getAgentById(m.senderId);
+                        if (agent) setAgentForDialog(agent);
+                      }}
+                      className={AVATAR_HOVER}
+                      aria-label={`About ${m.senderName ?? m.senderId}`}
+                    >
+                      {avatar}
+                    </button>
+                  ) : (
+                    avatar
+                  )}
                   <div
                     className={cn(
                       "text-foreground max-w-[85%] rounded-xl border px-3 py-2 text-sm wrap-break-word",
@@ -232,6 +325,12 @@ export function ChatPanel({
           </div>
         )}
       </div>
+
+      <AgentDialog
+        open={!!agentForDialog}
+        onOpenChange={(open) => !open && setAgentForDialog(null)}
+        agent={agentForDialog}
+      />
     </div>
   );
 }

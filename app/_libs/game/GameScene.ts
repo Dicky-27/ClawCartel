@@ -1,12 +1,12 @@
 import Phaser from "phaser";
-import { NPC, type NPCConfig } from "./NPC";
+import { MapAgent, type MapAgentConfig } from "./MapAgent";
 
 const TILE_SIZE    = 48;
 const PLAYER_SPEED = 180;
 const PLAYER_SCALE = 2.5;   // 16px × 2.5 = 40px visible
 const FRAME_RATE   = 8;
 
-// Walkable area bounds for NPC patrol (cols 2–27, rows 2–17 in pixels)
+// Walkable area bounds for agent patrol (cols 2–27, rows 2–17 in pixels)
 const ROOM_BOUNDS = {
   x1: 2  * TILE_SIZE,
   y1: 2  * TILE_SIZE,
@@ -14,12 +14,12 @@ const ROOM_BOUNDS = {
   y2: 17 * TILE_SIZE,
 };
 
-// Bob is the player — use Adam, Alex, Amelia as the 3 NPCs (+ a 4th Bob NPC)
-const NPC_CONFIGS: Omit<NPCConfig, "bounds">[] = [
+// Bob is the player — Adam, Alex, Amelia, BOB are the 4 map agents
+const AGENT_CONFIGS: Omit<MapAgentConfig, "bounds">[] = [
   { textureKey: "npc-adam",   name: "Adam",   x: 4  * TILE_SIZE + 24, y: 5  * TILE_SIZE + 24 },
   { textureKey: "npc-alex",   name: "Alex",   x: 8  * TILE_SIZE + 24, y: 7  * TILE_SIZE + 24 },
   { textureKey: "npc-amelia", name: "Amelia", x: 14 * TILE_SIZE + 24, y: 5  * TILE_SIZE + 24 },
-  { textureKey: "npc-bob",    name: "Bob NPC", x: 18 * TILE_SIZE + 24, y: 9  * TILE_SIZE + 24 },
+  { textureKey: "npc-bob",    name: "BOB",    x: 18 * TILE_SIZE + 24, y: 9  * TILE_SIZE + 24 },
 ];
 
 // Direction → frame range mapping (LimeZu _run_16x16.png row 0 layout)
@@ -64,11 +64,13 @@ export class GameScene extends Phaser.Scene {
   private wallLayer!: Phaser.Tilemaps.TilemapLayer;
   private interiorLayer!: Phaser.Tilemaps.TilemapLayer;
 
-  // NPCs
-  private npcs: NPC[] = [];
+  // Map agents (Adam, Alex, Amelia, BOB)
+  private agents: MapAgent[] = [];
 
   // Bridge callback → React (for coords HUD + socket in Phase 3)
   onPositionChange?: (x: number, y: number) => void;
+  /** When user clicks an agent on the map — name matches agent (e.g. "Adam", "Alex") */
+  onAgentInteract?: (agentName: string) => void;
 
   constructor() {
     super({ key: "GameScene" });
@@ -80,7 +82,7 @@ export class GameScene extends Phaser.Scene {
     this.buildTilemap();
     this.registerPlayerAnims();
     this.createPlayer();
-    this.createNPCs();
+    this.createAgents();
     this.setupInput();
     this.setupCollisions();
     this.setupCamera();
@@ -91,7 +93,7 @@ export class GameScene extends Phaser.Scene {
   update(_time: number, delta: number) {
     this.handleMovement();
     this.syncNameTagPosition();
-    for (const npc of this.npcs) npc.update(delta);
+    for (const agent of this.agents) agent.update(delta);
   }
 
   // ─── Tilemap ─────────────────────────────────────────────────────────────────
@@ -285,11 +287,17 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  // ─── NPCs ─────────────────────────────────────────────────────────────────────
+  // ─── Map agents ─────────────────────────────────────────────────────────────
 
-  private createNPCs() {
-    for (const config of NPC_CONFIGS) {
-      this.npcs.push(new NPC(this, { ...config, bounds: ROOM_BOUNDS }));
+  private createAgents() {
+    for (const config of AGENT_CONFIGS) {
+      const agent = new MapAgent(this, { ...config, bounds: ROOM_BOUNDS });
+      this.agents.push(agent);
+      // Click agent → notify React (e.g. open agents panel)
+      agent.sprite.setInteractive({ useHandCursor: true });
+      agent.sprite.on(Phaser.Input.Events.POINTER_DOWN, () => {
+        this.onAgentInteract?.(config.name);
+      });
     }
   }
 
@@ -298,9 +306,9 @@ export class GameScene extends Phaser.Scene {
   private setupCollisions() {
     this.physics.add.collider(this.player, this.wallLayer);
     this.physics.add.collider(this.player, this.interiorLayer);
-    for (const npc of this.npcs) {
-      this.physics.add.collider(npc.sprite, this.wallLayer);
-      this.physics.add.collider(npc.sprite, this.interiorLayer);
+    for (const agent of this.agents) {
+      this.physics.add.collider(agent.sprite, this.wallLayer);
+      this.physics.add.collider(agent.sprite, this.interiorLayer);
     }
   }
 

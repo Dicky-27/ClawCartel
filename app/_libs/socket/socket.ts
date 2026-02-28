@@ -13,7 +13,6 @@ export function getSocket(): Socket {
   return socket;
 }
 
-/** Call when app unmounts or to reset (e.g. logout). */
 export function disconnectSocket(): void {
   if (socket) {
     socket.disconnect();

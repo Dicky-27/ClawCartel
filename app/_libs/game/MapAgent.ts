@@ -14,38 +14,38 @@ type Direction = keyof typeof ANIM_FRAMES;
 
 const DIRECTIONS: Direction[] = ["down", "left", "right", "up"];
 
-const NPC_SPEED   = 60;   // pixels per second — slow & casual
+const AGENT_SPEED   = 60;   // pixels per second — slow & casual
 const FRAME_RATE  = 8;    // animation fps
 const SCALE       = 2.5;  // 16px × 2.5 = 40px visible — fits nicely with 48px tiles
 
-// How long (ms) an NPC stays in each state before switching
+// How long (ms) an agent stays in each state before switching
 const MIN_WALK_MS = 1000;
 const MAX_WALK_MS = 3000;
 const MIN_IDLE_MS = 500;
 const MAX_IDLE_MS = 2000;
 
-type NPCState = "walking" | "idle";
+type AgentState = "walking" | "idle";
 
-export type NPCConfig = {
+export type MapAgentConfig = {
   textureKey: string;  // e.g. "npc-adam"
   name: string;
   x: number;
   y: number;
-  // Walkable area bounds (in pixels) — NPC stays inside this box
+  // Walkable area bounds (in pixels) — agent stays inside this box
   bounds: { x1: number; y1: number; x2: number; y2: number };
 };
 
-export class NPC {
+export class MapAgent {
   readonly sprite: Phaser.Physics.Arcade.Sprite;
   private label: Phaser.GameObjects.Text;
 
-  private state: NPCState = "idle";
+  private state: AgentState = "idle";
   private direction: Direction = "down";
   private stateTimer = 0;   // counts down in ms
   private scene: Phaser.Scene;
-  private bounds: NPCConfig["bounds"];
+  private bounds: MapAgentConfig["bounds"];
 
-  constructor(scene: Phaser.Scene, config: NPCConfig) {
+  constructor(scene: Phaser.Scene, config: MapAgentConfig) {
     this.scene = scene;
     this.bounds = config.bounds;
 
@@ -55,7 +55,7 @@ export class NPC {
     this.sprite.setDepth(10);
     this.sprite.setCollideWorldBounds(true);
 
-    // Shrink physics body so NPC slides past thin gaps
+    // Shrink physics body so agent slides past thin gaps
     this.sprite.setBodySize(10, 10);
 
     // ── Name label ─────────────────────────────────────────────────────────
@@ -71,9 +71,9 @@ export class NPC {
       .setDepth(11);
 
     // ── Register directional walk animations (once per texture key) ────────
-    NPC.registerAnims(scene, config.textureKey);
+    MapAgent.registerAnims(scene, config.textureKey);
 
-    // Start with a random idle duration so all 4 NPCs don't sync up
+    // Start with a random idle duration so all 4 agents don't sync up
     this.stateTimer = Phaser.Math.Between(0, MAX_IDLE_MS);
     this.playIdle();
   }
@@ -95,14 +95,14 @@ export class NPC {
     // Sync label above sprite
     this.label.setPosition(this.sprite.x, this.sprite.y - 28);
 
-    // If NPC walked into a wall (velocity blocked by physics), pick a new direction
+    // If agent walked into a wall (velocity blocked by physics), pick a new direction
     if (this.state === "walking") {
       const body = this.sprite.body as Phaser.Physics.Arcade.Body;
       const blocked = body.blocked.left || body.blocked.right ||
                       body.blocked.up   || body.blocked.down;
       if (blocked) this.startWalking();
 
-      // If NPC walked out of bounds, reverse
+      // If agent walked out of bounds, reverse
       this.clampToBounds();
     }
   }
@@ -121,7 +121,7 @@ export class NPC {
     // Pick a random direction
     this.direction = DIRECTIONS[Phaser.Math.Between(0, 3)];
 
-    const vel = NPC_SPEED;
+    const vel = AGENT_SPEED;
     const body = this.sprite.body as Phaser.Physics.Arcade.Body;
 
     switch (this.direction) {
@@ -161,8 +161,8 @@ export class NPC {
   private static registeredKeys = new Set<string>();
 
   static registerAnims(scene: Phaser.Scene, textureKey: string) {
-    if (NPC.registeredKeys.has(textureKey)) return;
-    NPC.registeredKeys.add(textureKey);
+    if (MapAgent.registeredKeys.has(textureKey)) return;
+    MapAgent.registeredKeys.add(textureKey);
 
     for (const [dir, { start, end }] of Object.entries(ANIM_FRAMES)) {
       scene.anims.create({

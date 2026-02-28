@@ -8,14 +8,10 @@ const MIN_LOADING_MS = 600;
 
 export interface GlobalLoadingScreenProps {
   children: React.ReactNode;
-  /** Minimum time to show the loader (ms). */
   minDuration?: number;
   className?: string;
 }
 
-/**
- * Shows a full-screen pixelated loader on first load, then fades out to reveal children.
- */
 export function GlobalLoadingScreen({
   children,
   minDuration = MIN_LOADING_MS,

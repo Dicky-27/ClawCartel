@@ -4,8 +4,10 @@ import { ChatPanel, DUMMY_CHAT_MESSAGES } from "@/app/_components/chats/ChatPane
 import type { GameScene } from "@/app/_libs/game/GameScene";
 import { IdeLayout } from "@/app/_components/IdeLayout";
 import { PixelatedLoadingScreen } from "@/app/_components/ui/PixelatedLoadingScreen";
+import { getAgentByName } from "@/app/_data/agents";
+import type { Agent } from "@/app/_data/agents";
 import dynamic from "next/dynamic";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Builder from "../_components/builders/Builder";
 const PhaserGame = dynamic(
   () => import("@/app/_components/game/PhaserGame").then((m) => m.PhaserGame),
@@ -15,11 +17,29 @@ const PhaserGame = dynamic(
 export default function IdeLayoutPage() {
   const sceneRef = useRef<GameScene | null>(null);
   const [coords, setCoords] = useState({ x: 0, y: 0 });
+  const [agentsPanelOpen, setAgentsPanelOpen] = useState(false);
+  const [agentForDialog, setAgentForDialog] = useState<Agent | null>(null);
 
   // This fires every time the local player moves in Phaser
   const handlePositionChange = useCallback((x: number, y: number) => {
     setCoords({ x: Math.round(x), y: Math.round(y) });
   }, []);
+
+  // When user clicks an agent on the map, open that agent's dialog
+  const handleAgentInteract = useCallback((agentName: string) => {
+    const agent = getAgentByName(agentName);
+    if (agent) setAgentForDialog(agent);
+  }, []);
+
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!scene) return;
+    scene.onAgentInteract = handleAgentInteract;
+    return () => {
+      scene.onAgentInteract = undefined;
+    };
+  }, [handleAgentInteract]);
+
   return (
     <div className="bg-background flex h-full min-h-0 w-full flex-col">
       <div className="h-full min-h-0 flex-1">
@@ -29,11 +49,18 @@ export default function IdeLayoutPage() {
           defaultRightOpen={false}
           left={
             <ChatPanel
+              roomId="global"
               initialMessages={DUMMY_CHAT_MESSAGES}
+              agentsPanelOpen={agentsPanelOpen}
+              onAgentsPanelOpenChange={setAgentsPanelOpen}
+              agentForDialog={agentForDialog}
+              onAgentDialogChange={setAgentForDialog}
               emptyPlaceholder={
                 <>
                   <p>Start a conversation</p>
-                  <p className="mt-1 text-xs">Ask anything or describe what you’re building.</p>
+                  <p className="mt-1 text-xs">
+                    Click &quot;Agents&quot; or an agent avatar to read about them.
+                  </p>
                 </>
               }
             />

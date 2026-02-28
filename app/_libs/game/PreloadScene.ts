@@ -22,10 +22,10 @@ export class PreloadScene extends Phaser.Scene {
       frameHeight: 32,   // ← MUST be 16, not 32 (2 rows exist but each frame = 1 row)
     });
 
-    // ── NPC character spritesheets ───────────────────────────────────────────
+    // ── Agent character spritesheets (Adam, Alex, Amelia, BOB) ───────────────
     // Same layout: 24 cols × 2 rows, 16×16 per frame
-    const npcChars = ["Adam", "Alex", "Amelia", "Bob"];
-    for (const name of npcChars) {
+    const agentChars = ["Adam", "Alex", "Amelia", "Bob"];
+    for (const name of agentChars) {
       this.load.spritesheet(
         `npc-${name.toLowerCase()}`,
         `/assets/${name}_run_16x16.png`,
