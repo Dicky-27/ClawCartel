@@ -47,14 +47,6 @@ const AuthSchema = {
         },
       },
     },
-    error: {
-      value: {
-        status: 500,
-        code: 'ERROR',
-        message: 'Internal server error',
-        data: null,
-      },
-    },
   },
   siwsVerify: {
     tags: ['Auth'],
@@ -91,6 +83,14 @@ const AuthSchema = {
           },
         },
       },
+      error: {
+        value: {
+          status: 500,
+          code: 'ERROR',
+          message: 'Internal server error',
+          data: null,
+        },
+      },
     },
     examples: {
       success: {
@@ -105,13 +105,13 @@ const AuthSchema = {
           },
         },
       },
-    },
-    error: {
-      value: {
-        status: 500,
-        code: 'ERROR',
-        message: 'Internal server error',
-        data: null,
+      error: {
+        value: {
+          status: 500,
+          code: 'ERROR',
+          message: 'Internal server error',
+          data: null,
+        },
       },
     },
   },
