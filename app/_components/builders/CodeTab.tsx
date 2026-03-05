@@ -9,9 +9,9 @@ import { useState } from "react";
 import { FileTree } from "./FileTree";
 import { TerminalCard } from "./TerminalCard";
 
-const EDITOR_BG = "#0d0d0d";
-const LINE_NUM = "#6e7681";
-const CARET = "#f8f8f2";
+const EDITOR_BG = "var(--background)";
+const LINE_NUM = "var(--muted-foreground)";
+const CARET = "var(--foreground)";
 const EDITOR_FONT_SIZE = "0.875rem";
 const EDITOR_LINE_HEIGHT = "1.5rem";
 const EDITOR_PADDING = {
@@ -65,7 +65,7 @@ export default function CodeTab({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex min-h-0 flex-1 flex-col border-t md:flex-row">
+      <div className="border-border flex min-h-0 flex-1 flex-col border-t md:flex-row">
         <div
           className={cn(
             "border-border flex shrink-0 flex-col border-b md:min-h-0 md:w-[220px] md:min-w-0 md:border-r md:border-b-0",
@@ -97,7 +97,7 @@ export default function CodeTab({
         </div>
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden md:rounded-r-lg">
-          <div className="text-muted-foreground flex h-10 shrink-0 items-center gap-2 border-b px-3 py-2 font-mono text-xs">
+          <div className="border-border text-muted-foreground flex h-10 shrink-0 items-center gap-2 border-b px-3 py-2 font-mono text-xs">
             {/* Mobile  */}
             <button
               type="button"
@@ -176,7 +176,7 @@ export default function CodeTab({
                     </SyntaxHighlighter>
                   </div>
                   <textarea
-                    className="relative block w-full min-w-0 resize-none border-0 bg-transparent font-mono placeholder:text-[#6e7681] focus:ring-0 focus:outline-none"
+                    className="relative block w-full min-w-0 resize-none border-0 bg-transparent font-mono placeholder:text-muted-foreground focus:ring-0 focus:outline-none"
                     value={code}
                     onChange={(e) => onCodeChange(e.target.value)}
                     spellCheck={false}

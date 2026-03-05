@@ -55,9 +55,7 @@ export function IdeLayout({
 
   const [mobileView, setMobileView] = React.useState<MobileView>("center");
   const [leftWidth, setLeftWidth] = React.useState(defaultLeftSize);
-  const [rightWidth, setRightWidth] = React.useState(
-    defaultRightOpen ? defaultRightWidth : 0,
-  );
+  const [rightWidth, setRightWidth] = React.useState(defaultRightOpen ? defaultRightWidth : 0);
   const leftDragRef = React.useRef(false);
   const rightDragRef = React.useRef(false);
   const leftStartRef = React.useRef({ x: 0, w: 0 });
@@ -265,13 +263,13 @@ export function IdeLayout({
                       role="separator"
                       aria-orientation="vertical"
                       onMouseDown={handleRightDragStart}
-                      className="hover:bg-primary/30 active:bg-primary/50 absolute top-0 bottom-0 z-20 w-1 cursor-col-resize"
+                      className="hover:bg-primary/30 active:bg-primary/50 absolute top-0 bottom-0 z-20 my-5 mr-2 w-1 cursor-col-resize rounded-full"
                       style={{ right: rightWidth }}
                       aria-label="Resize right panel"
                     />
                     <div
                       className={cn(
-                        "bg-background absolute top-0 right-0 bottom-0 z-10 flex flex-col overflow-hidden border-l",
+                        "bg-card border-border absolute top-0 right-0 bottom-0 z-10 m-2 flex flex-col overflow-hidden rounded-xl border",
                         rightClassName,
                       )}
                       style={{ width: rightWidth }}
@@ -284,7 +282,7 @@ export function IdeLayout({
                       >
                         <PanelRightCloseIcon className="size-4" />
                       </button>
-                      <div className="min-h-0 flex-1 overflow-auto">{right}</div>
+                      <div className="bg-card min-h-0 flex-1 overflow-auto">{right}</div>
                     </div>
                   </>
                 ) : (

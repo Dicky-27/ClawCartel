@@ -1,7 +1,7 @@
 "use client";
 
 import { readDir } from "@/app/_libs/webcontainer/core";
-import { File, Folder } from "lucide-react";
+import { FolderIcon, FileIcon } from "@/app/_components/Icons";
 import { useCallback, useEffect, useState } from "react";
 
 export type FileTreeNode = {
@@ -66,14 +66,14 @@ function TreeItem({
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
-          className="hover:bg-muted flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-sm"
+          className="hover:bg-primary/10 flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-sm"
           style={{ paddingLeft: `${level * 12 + 8}px` }}
         >
           <span className="text-muted-foreground" aria-hidden>
             {open ? "▾" : "▸"}
           </span>
-          <span className="text-primary/80" aria-hidden>
-            <Folder className="text-primary/80 size-5" />
+          <span className="text-foreground" aria-hidden>
+            <FolderIcon className="text-foreground size-5" />
           </span>
           <span className="text-foreground truncate font-medium">{node.name}</span>
         </button>
@@ -98,7 +98,7 @@ function TreeItem({
     <button
       type="button"
       onClick={() => onSelectFile(node.path)}
-      className={`hover:bg-muted flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-sm ${
+      className={`hover:bg-primary/10 flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-sm ${
         isSelected ? "bg-primary/10 text-foreground" : "text-foreground"
       }`}
       style={{ paddingLeft: `${level * 12 + 8}px` }}
@@ -106,8 +106,8 @@ function TreeItem({
       <span className="text-muted-foreground w-4" aria-hidden>
         {" "}
       </span>
-      <span className="text-primary/80" aria-hidden>
-        <File className="text-primary/80 size-5" />
+      <span className="text-foreground" aria-hidden>
+        <FileIcon className="text-foreground size-5" />
       </span>
       <span className="truncate">{node.name}</span>
     </button>

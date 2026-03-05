@@ -12,7 +12,6 @@ import {
 } from "@/app/_libs/webcontainer/core";
 import type { WebContainerStatus } from "@/app/_libs/webcontainer/core";
 import { defaultPageContent } from "@/app/_libs/webcontainer/defaultProject";
-import { AppWindowIcon, CodeIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import CodeTab from "./CodeTab";
@@ -108,7 +107,9 @@ export default function Builder() {
     return (
       <div className="flex h-full flex-col items-center justify-center p-4 text-center">
         <div className="border-border bg-muted/50 rounded-lg border p-6">
-          <h2 className="text-foreground font-geist-semi-bold text-lg font-semibold">WebContainer not supported</h2>
+          <h2 className="text-foreground font-geist-semi-bold text-lg font-semibold">
+            WebContainer not supported
+          </h2>
           <p className="text-muted-foreground mt-2 text-sm">
             This needs cross-origin isolation. Use a supported browser (Chrome, Edge, Firefox, or
             Safari 16.4+).
@@ -121,20 +122,21 @@ export default function Builder() {
   return (
     <div className="flex h-full flex-col">
       <Tabs defaultValue="preview" className="flex h-full flex-1 flex-col gap-0 px-0">
+        <h1 className="text-foreground font-geist-semi-bold px-3 pt-3 text-lg font-semibold">
+          Files
+        </h1>
         <div className="shrink-0 p-2">
           <TabsList className="bg-primary/10 p-1">
             <TabsTrigger
               value="preview"
               className="data-active:bg-primary data-active:text-primary-foreground data-active:border-primary/30"
             >
-              <AppWindowIcon />
               Preview
             </TabsTrigger>
             <TabsTrigger
               value="code"
               className="data-active:bg-primary data-active:text-primary-foreground data-active:border-primary/30"
             >
-              <CodeIcon />
               Code
             </TabsTrigger>
           </TabsList>
