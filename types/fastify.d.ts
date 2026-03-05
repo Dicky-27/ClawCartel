@@ -10,6 +10,16 @@ export interface JwtPayload {
 }
 
 declare module 'fastify' {
+  interface FastifySchema {
+    tags?: string[]
+    summary?: string
+    description?: string
+    operationId?: string
+    consumes?: string[]
+    produces?: string[]
+    security?: Array<Record<string, string[]>>
+  }
+
   interface FastifyReply {
     json: (data?: object | string | number | boolean | null, status?: number, code?: string | null, message?: string | null) => void
   }

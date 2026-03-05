@@ -1,10 +1,12 @@
-import { DoneFuncWithErrOrRes, FastifyInstance, FastifyPluginOptions } from 'fastify'
-import AutonomousController from '#app/modules/agent/autonomous.controller'
-import { StartRunBody } from '#app/modules/agent/agent.interface'
-
 /**
- * Autonomous multi-agent discussion + code generation endpoints
+ * Autonomous Agent Routes
+ * Multi-round discussion + code generation
  */
+
+import { DoneFuncWithErrOrRes, FastifyInstance, FastifyPluginOptions } from 'fastify'
+import AutonomousController from '#app/modules/agent-autonomous/agent-autonomous.controller'
+import { StartRunBody } from '#app/modules/agent-core/agent-core.interface'
+
 export default function (
   app: FastifyInstance,
   _: FastifyPluginOptions,
@@ -172,26 +174,8 @@ export default function (
             type: 'object',
             properties: {
               runId: { type: 'string' },
-              files: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    name: { type: 'string' },
-                    type: { type: 'string', enum: ['file', 'directory'] },
-                    path: { type: 'string' },
-                    size: { type: 'number' },
-                    children: { type: 'array' },
-                  },
-                },
-              },
-              stats: {
-                type: 'object',
-                properties: {
-                  totalFiles: { type: 'number' },
-                  totalSize: { type: 'number' },
-                },
-              },
+              files: { type: 'array' },
+              stats: { type: 'object' },
             },
           },
         },

@@ -56,6 +56,16 @@ const fastify = Fastify({
           version: '1.0.0',
         },
         servers,
+        components: {
+          securitySchemes: {
+            bearerAuth: {
+              type: 'http',
+              scheme: 'bearer',
+              bearerFormat: 'JWT',
+              description: 'Paste your access token as: Bearer <token>',
+            },
+          },
+        },
         tags: [
           { name: 'Autonomous', description: 'Autonomous multi-agent discussion & code generation' },
           { name: 'Agent', description: 'Legacy agent endpoints' },
@@ -71,6 +81,7 @@ const fastify = Fastify({
       uiConfig: {
         docExpansion: 'list',
         deepLinking: false,
+        persistAuthorization: true,
       },
     })
 

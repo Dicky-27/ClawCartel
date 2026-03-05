@@ -1,10 +1,19 @@
+/**
+ * Autonomous Agent Controller
+ */
+
 import { FastifyReply, FastifyRequest } from 'fastify'
 import { createReadStream } from 'fs'
-import AutonomousAgentService from '#app/modules/agent/autonomous.service'
-import { fileSystem } from '#app/modules/agent/file-system.service'
-import { StartRunBody, RunParams } from '#app/modules/agent/agent.interface'
+import AutonomousAgentService from '#app/modules/agent-autonomous/agent-autonomous.service'
+import { fileSystem } from '#app/modules/agent-core/agent-core.files'
+import { StartRunBody } from '#app/modules/agent-core/agent-core.interface'
 import runService from '#app/modules/run/run.service'
+import ResponseUtil from '#app/utils/response'
 import Logger from '#app/utils/logger'
+
+interface RunParams {
+  runId: string
+}
 
 const AutonomousController = {
   startRun: async (
@@ -13,10 +22,7 @@ const AutonomousController = {
   ) => {
     const run = await AutonomousAgentService.startRun(request.server, request.body)
 
-    return reply.status(202).send({
-      status: 202,
-      data: run,
-    })
+    return ResponseUtil.accepted(reply, run)
   },
 
   getRun: async (
@@ -24,11 +30,11 @@ const AutonomousController = {
     reply: FastifyReply
   ) => {
     const run = await runService.getRun(request.params.runId)
+    if (!run) {
+      return ResponseUtil.notFound(reply, 'Run')
+    }
 
-    return reply.send({
-      status: 200,
-      data: run,
-    })
+    return ResponseUtil.success(reply, run)
   },
 
   continueToDevelopment: async (
@@ -40,13 +46,9 @@ const AutonomousController = {
 
     await AutonomousAgentService.continueToDevelopment(request.server, runId, approved)
 
-    return reply.send({
-      status: 200,
-      data: {
-        success: true,
-        message: approved ? 'Development phase started' : 'Run cancelled',
-        runId,
-      },
+    return ResponseUtil.success(reply, {
+      runId,
+      action: approved ? 'development_started' : 'cancelled',
     })
   },
 
@@ -55,31 +57,20 @@ const AutonomousController = {
     reply: FastifyReply
   ) => {
     const { runId } = request.params
-
     try {
       const files = await fileSystem.listDirectory(runId)
       const stats = await fileSystem.getStats(runId)
 
-      return reply.send({
-        status: 200,
-        data: {
-          runId,
-          files,
-          stats,
-        },
-      })
+      return ResponseUtil.success(reply, { runId, files, stats })
     } catch (error) {
       Logger.error({ runId, error }, 'Failed to list files')
 
-      return reply.status(500).send({
-        status: 500,
-        error: 'Failed to list files',
-      })
+      return ResponseUtil.internalError(reply, 'Failed to list files')
     }
   },
 
   getFileContent: async (
-    request: FastifyRequest<{ Params: RunParams & { filePath: string } }>,
+    request: FastifyRequest<{ Params: RunParams & { '*': string } }>,
     reply: FastifyReply
   ) => {
     const { runId } = request.params
@@ -88,15 +79,9 @@ const AutonomousController = {
     try {
       const content = await fileSystem.readFile(runId, filePath)
 
-      return reply.send({
-        status: 200,
-        data: { runId, filePath, content },
-      })
+      return ResponseUtil.success(reply, { runId, filePath, content })
     } catch (error) {
-      return reply.status(404).send({
-        status: 404,
-        error: 'File not found',
-      })
+      return ResponseUtil.notFound(reply, 'File')
     }
   },
 
@@ -111,13 +96,16 @@ const AutonomousController = {
       const stream = createReadStream(zipPath)
 
       reply.header('Content-Type', 'application/zip')
-      reply.header('Content-Disposition', `attachment; filename="project-${runId.slice(0, 8)}.zip"`)
+      reply.header(
+        'Content-Disposition',
+        `attachment; filename="clawcartel-project-${runId.slice(0, 8)}.zip"`
+      )
 
       return reply.send(stream)
     } catch (error) {
       Logger.error({ runId, error }, 'Failed to create zip')
 
-      return reply.status(500).json({ error: 'Failed to create download' })
+      return ResponseUtil.internalError(reply, 'Failed to create zip')
     }
   },
 }

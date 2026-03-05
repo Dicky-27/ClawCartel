@@ -1,110 +1,37 @@
 /**
- * Multi-Round Autonomous Discussion + Code Generation
- *
- * PM orchestrates a real conversation with multiple rounds, then agents write actual code files.
+ * Autonomous Agent Service
+ * Multi-round discussion + Code generation
  */
 
 import { FastifyInstance } from 'fastify'
-import { OpenClawGatewayClient } from '#app/modules/agent/openclaw.gateway'
-import { fileSystem } from '#app/modules/agent/file-system.service'
 import runService from '#app/modules/run/run.service'
 import Logger from '#app/utils/logger'
 import {
   AgentRole,
   StartRunBody,
   StreamEvent,
-} from '#app/modules/agent/agent.interface'
+} from '#app/modules/agent-core/agent-core.interface'
 import {
-  AgentRun,
-  EventType,
-  Run,
-} from '#app/modules/run/run.interface'
+  ROLE_AGENT_MAP,
+  SQUAD_ROLES,
+  AUTONOMOUS_AGENT_BRIEFS,
+} from '#app/modules/agent-core/agent-core.config'
+import { OpenClawGatewayClient } from '#app/modules/agent-core/agent-core.gateway'
+import { fileSystem } from '#app/modules/agent-core/agent-core.files'
+import { AgentRun, EventType, Run } from '#app/modules/run/run.interface'
 
-const ROLE_AGENT_MAP: Record<AgentRole, string> = {
-  pm: 'pm-agent',
-  // eslint-disable-next-line camelcase
-  be_sc: 'be-sc-agent',
-  fe: 'fe-agent',
-  // eslint-disable-next-line camelcase
-  bd_research: 'bd-research-agent',
-}
+const delay = (ms: number) => new Promise(r => setTimeout(r, ms))
 
-// Agent briefs
-const AGENT_BRIEFS: Record<AgentRole, {
-  name: string
-  emoji: string
-  role: string
-  systemPrompt: string
-}> = {
-  pm: {
-    name: 'PM',
-    emoji: '📋',
-    role: 'Product Lead',
-    systemPrompt: `You are PM, the Product Lead of ClawCartel AI Agency.
-
-PERSONALITY: Direct, decisive, slightly impatient but fair. Hates wasted time.
-SPEAKING STYLE: Short punchy sentences. Gets to the point.
-QUIRK: Always watching the clock. Says "Let's wrap this up" frequently.
-
-Your job: Lead squad discussions and coordinate code generation.`,
-  },
-  // eslint-disable-next-line camelcase
-  bd_research: {
-    name: 'Researcher',
-    emoji: '🔬',
-    role: 'BD + Researcher',
-    systemPrompt: `You are the Researcher at ClawCartel.
-
-PERSONALITY: Data-driven, curious, skeptical.
-SPEAKING STYLE: References numbers and real competitors.
-QUIRK: "Actually, the data shows..."
-
-During development: Write market research docs and project documentation.`,
-  },
-  fe: {
-    name: 'FE',
-    emoji: '🎨',
-    role: 'Frontend Dev',
-    systemPrompt: `You are FE, the Frontend Developer at ClawCartel.
-
-PERSONALITY: Creative, visual thinker, enthusiastic.
-SPEAKING STYLE: Visual descriptions, component thinking.
-QUIRK: Sees everything as React components.
-
-During development: Write actual React/Vue components, CSS, and frontend code.
-Always provide complete, working code with proper imports and exports.`,
-  },
-  // eslint-disable-next-line camelcase
-  be_sc: {
-    name: 'BE_SC',
-    emoji: '⚙️',
-    role: 'Backend + Smart Contract Dev',
-    systemPrompt: `You are BE_SC, the Backend + Smart Contract Developer.
-
-PERSONALITY: Technical, precise, security-obsessed.
-SPEAKING STYLE: Technical but concise.
-QUIRK: "What if it fails?" Gas cost obsession.
-
-During development: Write API routes, database models, and smart contracts.
-Always provide complete, working code with proper error handling.`,
-  },
-}
-
-// Track active discussions
-const activeDiscussions = new Map<string, {
+interface Discussion {
   round: number
   messages: Array<{ role: AgentRole; name: string; content: string }>
   isComplete: boolean
   waitingForUser: boolean
   projectName: string
-}>()
+}
 
-// Delay helper
-const delay = (ms: number) => new Promise(r => setTimeout(r, ms))
+const activeDiscussions = new Map<string, Discussion>()
 
-/**
- * Broadcast event to frontend
- */
 function broadcast(
   app: FastifyInstance,
   runId: string,
@@ -112,7 +39,7 @@ function broadcast(
   eventType: EventType,
   payload: Record<string, unknown>
 ): void {
-  const brief = AGENT_BRIEFS[role]
+  const brief = AUTONOMOUS_AGENT_BRIEFS[role]
 
   const streamEvent: StreamEvent = {
     runId,
@@ -131,16 +58,37 @@ function broadcast(
   app.io.to(`run:${runId}`).emit('agent_event', streamEvent)
 }
 
-/**
- * Build conversation context from messages
- */
 function buildContext(messages: Array<{ role: AgentRole; name: string; content: string }>): string {
   return messages.map(m => `${m.name}: ${m.content}`).join('\n\n')
 }
 
-/**
- * Stream agent response with file writing capability
- */
+async function extractAndWriteFiles(
+  app: FastifyInstance,
+  runId: string,
+  content: string,
+  agentName: string
+): Promise<void> {
+  const fileBlockRegex = /===FILE:([^=]+)===\n([\s\S]*?)===ENDFILE===/g
+  let match: RegExpExecArray | null
+
+  while ((match = fileBlockRegex.exec(content)) !== null) {
+    const filePath = match[1].trim()
+    const fileContent = match[2].trim()
+
+    try {
+      const event = await fileSystem.writeFile(runId, filePath, fileContent, agentName)
+      broadcast(app, runId, 'pm', 'agent.delta', {
+        message: `📁 Created: ${filePath}`,
+        phase: 'file_created',
+        fileEvent: event,
+        agentName,
+      })
+    } catch (error) {
+      Logger.error({ runId, filePath, error }, 'Failed to write file')
+    }
+  }
+}
+
 async function streamAgentResponse(
   app: FastifyInstance,
   runId: string,
@@ -151,9 +99,8 @@ async function streamAgentResponse(
   fileWrites?: Array<{ path: string; description: string }>
 ): Promise<string> {
   const gateway = new OpenClawGatewayClient()
-  const brief = AGENT_BRIEFS[role]
+  const brief = AUTONOMOUS_AGENT_BRIEFS[role]
 
-  // Simulate "thinking" delay
   await delay(1000 + Math.random() * 2000)
 
   let fileInstructions = ''
@@ -161,15 +108,7 @@ async function streamAgentResponse(
     fileInstructions = `\n\n=== FILE GENERATION TASK ===\nYou MUST write the following files:\n${fileWrites.map(f => `- ${f.path}: ${f.description}`).join('\n')}\n\nFor each file, output in this format:\n===FILE:filepath===\n<file content here>\n===ENDFILE===\n\nProvide complete, production-ready code.`
   }
 
-  const fullPrompt = `${brief.systemPrompt}
-
-=== CONVERSATION CONTEXT ===
-${context}
-
-=== YOUR TURN ===
-${prompt}${fileInstructions}
-
-Respond as ${brief.name} in your natural voice.`
+  const fullPrompt = `${brief.systemPrompt}\n\n=== CONVERSATION CONTEXT ===\n${context}\n\n=== YOUR TURN ===\n${prompt}${fileInstructions}\n\nRespond as ${brief.name} in your natural voice.`
 
   Logger.info({ runId, agent: brief.name }, 'Agent responding')
 
@@ -191,7 +130,6 @@ Respond as ${brief.name} in your natural voice.`
     if (chunk.done) break
     if (chunk.content) {
       fullText += chunk.content
-
       broadcast(app, runId, role, 'agent.delta', {
         message: chunk.content,
         accumulated: fullText,
@@ -207,7 +145,6 @@ Respond as ${brief.name} in your natural voice.`
     agentEmoji: brief.emoji,
   })
 
-  // Extract and write files if specified
   if (fileWrites && fileWrites.length > 0) {
     await extractAndWriteFiles(app, runId, fullText, brief.name)
   }
@@ -217,43 +154,6 @@ Respond as ${brief.name} in your natural voice.`
   return fullText
 }
 
-/**
- * Extract file blocks from agent response and write to disk
- */
-async function extractAndWriteFiles(
-  app: FastifyInstance,
-  runId: string,
-  content: string,
-  agentName: string
-): Promise<void> {
-  const fileBlockRegex = /===FILE:([^=]+)===\n([\s\S]*?)===ENDFILE===/g
-  let match: RegExpExecArray | null
-
-  while ((match = fileBlockRegex.exec(content)) !== null) {
-    const filePath = match[1].trim()
-    const fileContent = match[2].trim()
-
-    try {
-      const event = await fileSystem.writeFile(runId, filePath, fileContent, agentName)
-
-      // Broadcast file creation event
-      broadcast(app, runId, 'pm', 'agent.delta', {
-        message: `📁 Created: ${filePath}`,
-        phase: 'file_created',
-        fileEvent: event,
-        agentName,
-      })
-
-      Logger.info({ runId, filePath, agent: agentName }, 'File created')
-    } catch (error) {
-      Logger.error({ runId, filePath, error }, 'Failed to write file')
-    }
-  }
-}
-
-/**
- * Multi-round autonomous discussion
- */
 async function processMultiRoundDiscussion(
   app: FastifyInstance,
   run: Run,
@@ -264,10 +164,9 @@ async function processMultiRoundDiscussion(
 
   Logger.info({ runId, projectName }, 'Starting MULTI-ROUND autonomous discussion')
 
-  // Initialize discussion
-  const discussion = {
+  const discussion: Discussion = {
     round: 1,
-    messages: [] as Array<{ role: AgentRole; name: string; content: string }>,
+    messages: [],
     isComplete: false,
     waitingForUser: false,
     projectName,
@@ -276,8 +175,33 @@ async function processMultiRoundDiscussion(
 
   await runService.updateRun(run.id, { status: 'executing' })
 
+  // Intent analysis
+  const intentAnalysis = await streamAgentResponse(
+    app, runId, null, 'pm',
+    `Analyze this user message INTENT:\n"${inputText}"\n\nIs this:\nA) BUILD INTENT - user wants to build a project (proceed with squad)\nB) CASUAL CHAT - user is asking a question or chatting (respond directly)\n\nIf A: Say "[BUILD]" then introduce the project.\nIf B: Say "[CHAT]" then answer directly without involving the squad.`,
+    `User input: ${inputText}`
+  )
+
+  // Check if casual chat
+  if (intentAnalysis.includes('[CHAT]') ||
+      (!intentAnalysis.includes('[BUILD]') &&
+       (inputText.toLowerCase().includes('what is') ||
+        inputText.toLowerCase().includes('how are') ||
+        inputText.toLowerCase().includes('explain') ||
+        inputText.toLowerCase().includes('?')))) {
+    Logger.info({ runId }, 'PM classified as casual chat - skipping squad')
+    broadcast(app, runId, 'pm', 'run.done', {
+      message: intentAnalysis.replace('[CHAT]', '').trim(),
+      phase: 'chat_response',
+      isChat: true,
+    })
+    await runService.updateRun(run.id, { status: 'completed' })
+    activeDiscussions.delete(runId)
+
+    return
+  }
+
   // ROUND 1: Initial thoughts
-  Logger.info({ runId, round: 1 }, 'ROUND 1: Initial thoughts')
   broadcast(app, runId, 'pm', 'agent.started', {
     message: 'Starting multi-round discussion',
     phase: 'round_1',
@@ -290,8 +214,8 @@ async function processMultiRoundDiscussion(
   )
   discussion.messages.push({ role: 'pm', name: 'PM', content: pmOpening })
 
-  for (const role of ['bd_research', 'fe', 'be_sc'] as AgentRole[]) {
-    const brief = AGENT_BRIEFS[role]
+  for (const role of SQUAD_ROLES) {
+    const brief = AUTONOMOUS_AGENT_BRIEFS[role]
     const response = await streamAgentResponse(
       app, runId, null, role,
       'Share your initial thoughts on this project.',
@@ -311,8 +235,8 @@ async function processMultiRoundDiscussion(
   )
   discussion.messages.push({ role: 'pm', name: 'PM', content: pmR2 })
 
-  for (const role of ['bd_research', 'fe', 'be_sc'] as AgentRole[]) {
-    const brief = AGENT_BRIEFS[role]
+  for (const role of SQUAD_ROLES) {
+    const brief = AUTONOMOUS_AGENT_BRIEFS[role]
     const response = await streamAgentResponse(
       app, runId, null, role,
       'Respond to the challenges. Defend your position or concede points.',
@@ -332,8 +256,8 @@ async function processMultiRoundDiscussion(
   )
   discussion.messages.push({ role: 'pm', name: 'PM', content: pmR3 })
 
-  for (const role of ['bd_research', 'fe', 'be_sc'] as AgentRole[]) {
-    const brief = AGENT_BRIEFS[role]
+  for (const role of SQUAD_ROLES) {
+    const brief = AUTONOMOUS_AGENT_BRIEFS[role]
     const response = await streamAgentResponse(
       app, runId, null, role,
       'Give your FINAL position. Bottom line?',
@@ -350,7 +274,6 @@ async function processMultiRoundDiscussion(
   )
   discussion.messages.push({ role: 'pm', name: 'PM', content: pmFinal })
 
-  // Mark complete
   discussion.isComplete = true
   discussion.waitingForUser = true
 
@@ -363,12 +286,108 @@ async function processMultiRoundDiscussion(
     projectName: discussion.projectName,
   })
 
-  Logger.info({ runId, messageCount: discussion.messages.length }, 'Discussion complete, waiting for user')
+  Logger.info({ runId, messageCount: discussion.messages.length }, 'Discussion complete')
 }
 
-/**
- * Continue to development - CODE GENERATION PHASE
- */
+// Code Generation Phases
+const PHASES = {
+  research: {
+    role: 'bd_research' as AgentRole,
+    files: [
+      { path: 'research/market-analysis.md', description: 'Market analysis with size, trends, competitors' },
+      { path: 'research/competitor-report.md', description: 'Top 5 competitors analysis' },
+      { path: 'docs/project-requirements.md', description: 'Project requirements based on discussion' },
+    ],
+    prompt: (ctx: string) => `Create project documentation based on our discussion:\n\n${ctx}`,
+  },
+  backend: {
+    role: 'be_sc' as AgentRole,
+    files: [
+      { path: 'backend/package.json', description: 'Hono + TypeScript + Prisma dependencies' },
+      { path: 'backend/src/index.ts', description: 'Hono app entry point with middleware setup' },
+      { path: 'backend/src/routes/index.ts', description: 'Route aggregator' },
+      { path: 'backend/src/routes/api.ts', description: 'Main API routes with Hono' },
+      { path: 'backend/src/middleware/auth.ts', description: 'JWT auth middleware' },
+      { path: 'backend/src/middleware/error.ts', description: 'Global error handler' },
+      { path: 'backend/src/lib/db.ts', description: 'Prisma client setup' },
+      { path: 'backend/prisma/schema.prisma', description: 'Database schema' },
+      { path: 'backend/src/types/index.ts', description: 'TypeScript types/interfaces' },
+      { path: 'backend/.env.example', description: 'Environment variables template' },
+      { path: 'backend/README.md', description: 'Setup instructions (Hono + Prisma)' },
+    ],
+    prompt: (ctx: string) => `Create a production-ready backend using HONO framework.
+
+REQUIREMENTS:
+- Use Hono (not Express) - it's lightweight and fast
+- TypeScript with strict types
+- Prisma ORM with PostgreSQL
+- JWT authentication middleware
+- Input validation on all routes
+- Proper error handling middleware
+- Health check endpoint
+
+Think critically: 
+- What happens if DB is down?
+- Are we handling CORS properly?
+- Is this endpoint idempotent?
+- Did we prevent N+1 queries?
+
+Context:\n${ctx}`,
+  },
+  frontend: {
+    role: 'fe' as AgentRole,
+    files: [
+      { path: 'frontend/package.json', description: 'React 18 + TypeScript + Vite dependencies' },
+      { path: 'frontend/vite.config.ts', description: 'Vite configuration with path aliases' },
+      { path: 'frontend/tsconfig.json', description: 'TypeScript strict config' },
+      { path: 'frontend/index.html', description: 'HTML entry point' },
+      { path: 'frontend/src/main.tsx', description: 'React 18 entry with createRoot' },
+      { path: 'frontend/src/App.tsx', description: 'Main App with routing' },
+      { path: 'frontend/src/components/Layout/Layout.tsx', description: 'Layout with nav + error boundary' },
+      { path: 'frontend/src/components/Layout/Layout.module.css', description: 'Layout scoped styles' },
+      { path: 'frontend/src/components/UI/Loading.tsx', description: 'Reusable loading spinner' },
+      { path: 'frontend/src/components/UI/ErrorFallback.tsx', description: 'Error boundary fallback' },
+      { path: 'frontend/src/pages/Home/Home.tsx', description: 'Home page component' },
+      { path: 'frontend/src/hooks/useApi.ts', description: 'Type-safe API hook with error handling' },
+      { path: 'frontend/src/types/index.ts', description: 'Shared TypeScript interfaces' },
+      { path: 'frontend/src/lib/utils.ts', description: 'Helper utilities' },
+      { path: 'frontend/src/index.css', description: 'TailwindCSS imports + global styles' },
+      { path: 'frontend/.env.example', description: 'Environment variables template' },
+      { path: 'frontend/README.md', description: 'Setup instructions (Vite)' },
+    ],
+    prompt: (ctx: string) => `Create a production-ready frontend using REACT + VITE.
+
+REQUIREMENTS:
+- React 18 with TypeScript (strict mode)
+- Vite as build tool (not CRA)
+- TailwindCSS for styling
+- Proper folder structure (components/, pages/, hooks/, types/)
+- Error boundaries on routes
+- Loading states for async operations
+- Responsive mobile-first design
+
+CRITICAL THINKING - Ask yourself:
+- Did I handle the loading state?
+- What if the API returns an error?
+- Is this accessible (ARIA, keyboard nav)?
+- Will this look good on mobile?
+- Are props properly typed?
+- Is the component too big? Should I split it?
+
+Context:\n${ctx}`,
+  },
+  deploy: {
+    role: 'pm' as AgentRole,
+    files: [
+      { path: 'deployment/docker-compose.yml', description: 'Docker compose for full stack' },
+      { path: 'deployment/deploy.sh', description: 'Deployment script' },
+      { path: 'docs/ARCHITECTURE.md', description: 'System architecture diagram and docs' },
+      { path: 'docs/GETTING_STARTED.md', description: 'How to run the project locally' },
+    ],
+    prompt: () => 'Create deployment configuration and final documentation.',
+  },
+}
+
 export async function continueToDevelopment(
   app: FastifyInstance,
   runId: string,
@@ -390,12 +409,10 @@ export async function continueToDevelopment(
     return
   }
 
-  // Start CODE GENERATION
   Logger.info({ runId }, '=== STARTING CODE GENERATION ===')
   discussion.waitingForUser = false
   await runService.updateRun(runId, { status: 'executing' })
 
-  // Initialize project structure
   broadcast(app, runId, 'pm', 'agent.started', {
     message: '🚀 Initializing project workspace...',
     phase: 'code_generation',
@@ -403,94 +420,60 @@ export async function continueToDevelopment(
 
   await fileSystem.initProject(runId, discussion.projectName)
 
-  // PHASE 1: Researcher - Project Documentation
+  const context = buildContext(discussion.messages)
+
+  // Phase 1: Researcher
   broadcast(app, runId, 'pm', 'agent.delta', {
     message: '\n[Phase 1/4: Researcher - Project Documentation]',
     phase: 'phase_1_docs',
   })
-
-  const researchFiles = [
-    { path: 'research/market-analysis.md', description: 'Market analysis with size, trends, competitors' },
-    { path: 'research/competitor-report.md', description: 'Top 5 competitors analysis' },
-    { path: 'docs/project-requirements.md', description: 'Project requirements based on discussion' },
-  ]
-
   await streamAgentResponse(
-    app, runId, null, 'bd_research',
-    `Create project documentation based on our discussion:\n\n${buildContext(discussion.messages)}`,
+    app, runId, null, PHASES.research.role,
+    PHASES.research.prompt(context),
     '',
-    researchFiles
+    PHASES.research.files
   )
 
-  // PHASE 2: BE_SC - Backend & Smart Contracts
+  // Phase 2: Backend
   broadcast(app, runId, 'pm', 'agent.delta', {
     message: '\n[Phase 2/4: BE_SC - Backend Architecture]',
     phase: 'phase_2_backend',
   })
-
-  const backendFiles = [
-    { path: 'backend/package.json', description: 'Node.js dependencies (express, prisma, etc)' },
-    { path: 'backend/src/api/routes.ts', description: 'Main API routes' },
-    { path: 'backend/src/models/schema.prisma', description: 'Database schema' },
-    { path: 'backend/src/contracts/main.sol', description: 'Solidity smart contract (if needed)' },
-    { path: 'backend/README.md', description: 'Backend setup instructions' },
-  ]
-
   await streamAgentResponse(
-    app, runId, null, 'be_sc',
-    `Create the complete backend based on project requirements.\n\nContext:\n${buildContext(discussion.messages)}`,
+    app, runId, null, PHASES.backend.role,
+    PHASES.backend.prompt(context),
     '',
-    backendFiles
+    PHASES.backend.files
   )
 
-  // PHASE 3: FE - Frontend Application
+  // Phase 3: Frontend
   broadcast(app, runId, 'pm', 'agent.delta', {
     message: '\n[Phase 3/4: FE - Frontend Application]',
     phase: 'phase_3_frontend',
   })
-
-  const frontendFiles = [
-    { path: 'frontend/package.json', description: 'React/Vue dependencies' },
-    { path: 'frontend/src/App.tsx', description: 'Main App component' },
-    { path: 'frontend/src/components/Layout.tsx', description: 'Layout component with navigation' },
-    { path: 'frontend/src/pages/Home.tsx', description: 'Home page component' },
-    { path: 'frontend/src/hooks/useApi.ts', description: 'API hook for backend calls' },
-    { path: 'frontend/src/index.css', description: 'Global styles' },
-    { path: 'frontend/README.md', description: 'Frontend setup instructions' },
-  ]
-
   await streamAgentResponse(
-    app, runId, null, 'fe',
-    `Create the complete frontend application. Use modern React with TypeScript.\n\nContext:\n${buildContext(discussion.messages)}`,
+    app, runId, null, PHASES.frontend.role,
+    PHASES.frontend.prompt(context),
     '',
-    frontendFiles
+    PHASES.frontend.files
   )
 
-  // PHASE 4: PM - Deployment & Integration
+  // Phase 4: Deployment
   broadcast(app, runId, 'pm', 'agent.delta', {
     message: '\n[Phase 4/4: PM - Deployment Configuration]',
     phase: 'phase_4_deploy',
   })
-
-  const deployFiles = [
-    { path: 'deployment/docker-compose.yml', description: 'Docker compose for full stack' },
-    { path: 'deployment/deploy.sh', description: 'Deployment script' },
-    { path: 'docs/ARCHITECTURE.md', description: 'System architecture diagram and docs' },
-    { path: 'docs/GETTING_STARTED.md', description: 'How to run the project locally' },
-  ]
-
   await streamAgentResponse(
-    app, runId, null, 'pm',
-    'Create deployment configuration and final documentation.',
+    app, runId, null, PHASES.deploy.role,
+    PHASES.deploy.prompt(),
     '',
-    deployFiles
+    PHASES.deploy.files
   )
 
-  // Get final stats
+  // Complete
   const stats = await fileSystem.getStats(runId)
   const fileList = await fileSystem.getAllFiles(runId)
 
-  // Complete
   await runService.updateRun(runId, { status: 'completed' })
   broadcast(app, runId, 'pm', 'run.done', {
     message: `✅ Code generation complete! ${stats.totalFiles} files created.`,
@@ -504,9 +487,6 @@ export async function continueToDevelopment(
   activeDiscussions.delete(runId)
 }
 
-/**
- * Autonomous Agent Service
- */
 const AutonomousAgentService = {
   startRun: async (app: FastifyInstance, body: StartRunBody): Promise<Run> => {
     const inputText = body.prdText?.trim() || body.idea?.trim() || ''
@@ -533,7 +513,7 @@ const AutonomousAgentService = {
       throw new Error(`OpenClaw gateway unreachable: ${message}`)
     }
 
-    // Start multi-round discussion
+    // Start discussion
     void processMultiRoundDiscussion(app, run, inputText)
       .catch(async (error) => {
         Logger.error({ err: error, runId: run.id }, 'Multi-round discussion failed')
@@ -549,7 +529,5 @@ const AutonomousAgentService = {
   getDiscussion: (runId: string) => activeDiscussions.get(runId),
   fileSystem,
 }
-
-export { fileSystem }
 
 export default AutonomousAgentService
