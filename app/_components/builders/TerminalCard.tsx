@@ -20,10 +20,10 @@ export function TerminalCard({ output }: TerminalCardProps) {
       <div className="border-border border-b px-4 py-2">
         <h2 className="text-foreground font-geist-semi-bold text-sm font-semibold">Terminal</h2>
       </div>
-      <div className="flex-1 overflow-hidden rounded-b-lg bg-black p-0">
+      <div className="bg-background flex-1 overflow-hidden rounded-b-lg p-0">
         <pre
           ref={preRef}
-          className="text-foreground h-full overflow-auto p-4 font-mono text-xs leading-relaxed break-all whitespace-pre-wrap"
+          className="text-primary h-full overflow-auto p-4 font-mono text-xs leading-relaxed break-all whitespace-pre-wrap"
           role="log"
           aria-live="polite"
         >

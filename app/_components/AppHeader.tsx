@@ -1,6 +1,5 @@
 "use client";
 
-import { WalletConnectButton } from "@/app/_components/WalletConnectButton";
 import { cn } from "@/app/_libs/utils";
 import Image from "next/image";
 
@@ -8,21 +7,22 @@ export function AppHeader({ className }: { className?: string }) {
   return (
     <header
       className={cn(
-        "border-border bg-background/95 supports-backdrop-filter:bg-background/80 sticky top-0 z-40 flex h-10 shrink-0 items-center justify-between border-b px-4 backdrop-blur",
+        "bg-background fixed inset-0 top-0 z-10 flex h-14 w-full items-start justify-center",
         className,
       )}
     >
-      <div className="flex items-center gap-1">
+      <div className="relative flex w-full items-center justify-center">
         <Image
-          src="/images/img-logo.png"
+          src="/images/img-header.png"
           alt="Claw Cartel"
-          width={50}
-          height={50}
-          className="size-8 rounded-lg object-contain"
+          width={500}
+          height={500}
+          className="absolute top-0 w-64 object-contain"
         />
-        <h1 className="text-primary font-pixeloid-sans-bold text-sm font-bold">Claw Cartel</h1>
+        <p className="font-pixeloid-sans-bold text-primary relative pt-1 text-sm font-bold">
+          ClawCartel
+        </p>
       </div>
-      <WalletConnectButton />
     </header>
   );
 }
