@@ -75,9 +75,15 @@ const FastifyUtil = {
       reply: FastifyReply
     ) {
       // Use standardized response format
-      const status = error.statusCode || 500
-      const code = (error as any).code || 'SYSTEM_ERROR'
-      const message = error.message || 'An error occurred on the system'
+      const appError = error as FastifyError & {
+        status?: number
+        statusCode?: number
+        code?: string
+      }
+
+      const status = appError.statusCode ?? appError.status ?? 500
+      const code = appError.code ?? 'SYSTEM_ERROR'
+      const message = appError.message || 'An error occurred on the system'
 
       return reply.status(status).send({
         status,

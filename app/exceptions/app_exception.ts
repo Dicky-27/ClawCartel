@@ -17,6 +17,10 @@ export default class AppException extends Error {
     return this._status
   }
 
+  public get statusCode() {
+    return this._status
+  }
+
   public get code() {
     return this._code
   }
