@@ -1,15 +1,6 @@
 {
-  "name": "Claw Cartel",
-  "short_name": "CC",
-  "description": "AgentClaw Cartel (CC) is a collaborative AI workspace.",
-  "start_url": "/",
-  "scope": "/",
-  "id": "/",
-  "display": "standalone",
-  "orientation": "portrait",
-  "theme_color": "#222226",
-  "background_color": "#222226",
-  "categories": ["productivity", "utilities"],
+  "name": "ClawCartel",
+  "short_name": "ClawCartel",
   "icons": [
     {
       "src": "/web-app-manifest-192x192.png",
@@ -22,12 +13,9 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
-    },
-    {
-      "src": "/web-app-manifest-512x512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
     }
-  ]
+  ],
+  "theme_color": "#ffffff",
+  "background_color": "#ffffff",
+  "display": "standalone"
 }

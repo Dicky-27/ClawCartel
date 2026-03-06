@@ -3,6 +3,7 @@ import "../styles/index.css";
 import { AppHeader } from "./_components/AppHeader";
 import { GlobalLoadingGate } from "./_components/GlobalLoadingGate";
 import { WalletConnectDialog } from "./_components/ui/WalletConnectDialog";
+import WelcomeDialog from "./_components/dialogs/WelcomeDialog";
 import { Providers } from "./providers";
 
 export const viewport: Viewport = {
@@ -38,7 +39,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning className="h-full">
+    <html lang="en" suppressHydrationWarning className="dark h-full">
       <head />
       <body className="h-full min-h-screen font-sans" suppressHydrationWarning>
         <Providers>
@@ -47,6 +48,7 @@ export default function RootLayout({
               <AppHeader />
               <main className="min-h-0 flex-1 overflow-hidden">{children}</main>
               <WalletConnectDialog />
+              <WelcomeDialog />
             </div>
           </GlobalLoadingGate>
         </Providers>

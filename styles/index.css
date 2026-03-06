@@ -16,6 +16,16 @@
   }
 }
 
+/* Indeterminate progress bar (primary color) for loading screens */
+@keyframes loading-progress-indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+
 /* ─── Pixelated loading screen ─────────────────────────────────────────────── */
 @keyframes pixel-glow {
   0%,
@@ -85,12 +95,7 @@
   pointer-events: none;
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    to bottom,
-    transparent 0%,
-    rgb(0 0 0 / 0.03) 50%,
-    transparent 100%
-  );
+  background: linear-gradient(to bottom, transparent 0%, rgb(0 0 0 / 0.03) 50%, transparent 100%);
   background-size: 100% 4px;
   animation: pixel-scanline 2.5s linear infinite;
 }
@@ -129,6 +134,45 @@
   }
 }
 
+/* Global loading: claw image animation */
+@keyframes loading-claw {
+  0%,
+  100% {
+    opacity: 0.85;
+    transform: scale(0.95);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+}
+
+.animate-loading-claw {
+  animation: loading-claw 1.2s ease-in-out infinite;
+}
+
+/* Typewriter cursor blink */
+@keyframes typing-cursor-blink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  51%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.typing-cursor {
+  animation: typing-cursor-blink 0.7s step-end infinite;
+}
+
+/* Mobile bottom sheet: 90% of viewport; dvh for mobile browser chrome, vh fallback */
+.mobile-sheet-height {
+  height: 90vh;
+  height: 90dvh !important;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -137,7 +181,7 @@
     @apply cursor-pointer;
   }
   html {
-    @apply text-foreground bg-background font-sans scroll-smooth font-normal antialiased;
+    @apply text-foreground bg-background scroll-smooth font-sans font-normal antialiased;
     font-synthesis: none;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;

@@ -11,28 +11,28 @@ const DEFAULT_PAGE_CONTENT = `export default function Page() {
         justifyContent: 'center',
         gap: '1.5rem',
         padding: '2rem',
-        background: 'linear-gradient(145deg, #0d0d0d 0%, #1a1a2e 50%, #16213e 100%)',
-        fontFamily: 'system-ui, -apple-system, sans-serif',
-        color: '#f8f8f2',
+        background: 'linear-gradient(160deg, #faf8f6 0%, #f0ebe6 40%, #ebe3dc 100%)',
+        fontFamily: '"Silkscreen", "Press Start 2P", monospace',
+        color: '#613f26',
       }}
     >
       <div
         style={{
           textAlign: 'center',
           padding: '2.5rem 3rem',
-          borderRadius: '1rem',
-          background: 'rgba(255,255,255,0.03)',
-          border: '1px solid rgba(255,255,255,0.08)',
-          boxShadow: '0 0 60px rgba(0,0,0,0.4)',
+          borderRadius: '0.625rem',
+          background: '#b8b0ae',
+          border: '1px solid #a8a19f',
+          boxShadow: '6px 6px 0 0 #827b79 inset',
         }}
       >
         <h1
           style={{
             margin: 0,
-            fontSize: 'clamp(2rem, 5vw, 3rem)',
-            fontWeight: 800,
-            letterSpacing: '-0.02em',
-            background: 'linear-gradient(135deg, #f8f8f2 0%, #bd93f9 50%, #ff79c6 100%)',
+            fontSize: 'clamp(1.25rem, 4vw, 2rem)',
+            fontFamily: '"Press Start 2P", "Silkscreen", monospace',
+            letterSpacing: '0.02em',
+            background: 'linear-gradient(135deg, #613f26 0%, #8b5a3c 40%, #ffbc8d 100%)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
             backgroundClip: 'text',
@@ -43,9 +43,9 @@ const DEFAULT_PAGE_CONTENT = `export default function Page() {
         <p
           style={{
             margin: '1rem 0 0',
-            fontSize: '1rem',
-            color: 'rgba(248,248,242,0.7)',
-            fontWeight: 500,
+            fontSize: '0.875rem',
+            fontFamily: '"Silkscreen", "Press Start 2P", monospace',
+            color: 'rgba(97,63,38,0.75)',
           }}
         >
           Edit the code → preview updates live.
@@ -57,11 +57,12 @@ const DEFAULT_PAGE_CONTENT = `export default function Page() {
             alignItems: 'center',
             justifyContent: 'center',
             gap: '0.5rem',
-            fontSize: '0.875rem',
-            color: 'rgba(248,248,242,0.5)',
+            fontFamily: '"Silkscreen", monospace',
+            fontSize: '0.75rem',
+            color: 'rgba(97,63,38,0.55)',
           }}
         >
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#50fa7b', animation: 'pulse 1.5s ease-in-out infinite' }} />
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ffbc8d', animation: 'pulse 1.5s ease-in-out infinite' }} />
           Ready
         </div>
       </div>
@@ -132,12 +133,17 @@ export default function RootLayout({ children }) {
       },
       "globals.css": {
         file: {
-          contents: `* { box-sizing: border-box; }
+          contents: `@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Silkscreen:wght@400;700&display=swap');
+
+* { box-sizing: border-box; }
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  font-family: 'Silkscreen', 'Press Start 2P', monospace;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: unset;
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
 }
 @keyframes pulse {
   0%, 100% { opacity: 1; transform: scale(1); }

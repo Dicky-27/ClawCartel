@@ -24,6 +24,7 @@ export default function IdeLayoutPage() {
   const [coords, setCoords] = useState({ x: 0, y: 0 });
   const [agentsPanelOpen, setAgentsPanelOpen] = useState(false);
   const [agentForDialog, setAgentForDialog] = useState<Agent | null>(null);
+  const [isMobileSheetOpen, setMobileSheetOpen] = useState(false);
   const isMobileViewport = useMediaQuery(MOBILE_VIEWPORT);
 
   const handlePositionChange = useCallback((x: number, y: number) => {
@@ -55,20 +56,13 @@ export default function IdeLayoutPage() {
           defaultLeftSize={380}
           defaultRightWidth={300}
           defaultRightOpen={false}
+          onMobileSheetOpenChange={setMobileSheetOpen}
           left={
             <ChatPanel
               agentsPanelOpen={agentsPanelOpen}
               onAgentsPanelOpenChange={setAgentsPanelOpen}
               agentForDialog={agentForDialog}
               onAgentDialogChange={setAgentForDialog}
-              emptyPlaceholder={
-                <>
-                  <p>Start a conversation</p>
-                  <p className="mt-1 text-xs">
-                    Describe your project idea to kick off the agent discussion.
-                  </p>
-                </>
-              }
             />
           }
           right={<Builder />}
@@ -79,7 +73,10 @@ export default function IdeLayoutPage() {
             <div className="pointer-events-none absolute top-12 left-1/2 -translate-x-1/2 font-mono text-xs text-white/40">
               {coords.x}, {coords.y}
             </div>
-            <MobileJoystick enabled={isMobileViewport} onMove={handleJoystickMove} />
+            <MobileJoystick
+              enabled={isMobileViewport && !isMobileSheetOpen}
+              onMove={handleJoystickMove}
+            />
           </div>
         </IdeLayout>
       </div>

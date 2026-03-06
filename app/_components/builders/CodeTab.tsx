@@ -64,8 +64,8 @@ export default function CodeTab({
   const [mobileFilesOpen, setMobileFilesOpen] = useState(false);
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="border-border flex min-h-0 flex-1 flex-col border-t md:flex-row">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="border-border flex min-h-0 flex-1 flex-col overflow-hidden border-t md:flex-row">
         <div
           className={cn(
             "border-border flex shrink-0 flex-col border-b md:min-h-0 md:w-[220px] md:min-w-0 md:border-r md:border-b-0",
@@ -119,11 +119,15 @@ export default function CodeTab({
               <span className={mobileFilesOpen ? "hidden md:inline" : ""}>Select a file</span>
             )}
           </div>
-          <div className="flex min-h-0 flex-1 overflow-auto">
+          <div
+            className="overflow-x-hidden overflow-y-auto overscroll-contain"
+            style={{ minHeight: 0, flex: "1 1 0%" }}
+          >
             <div
-              className="flex min-h-full w-full font-mono text-sm"
+              className="flex w-full font-mono text-sm"
               style={{
-                minHeight: `${Math.max(1, lines.length) * 1.5}rem`,
+                height: `${Math.max(1, lines.length) * 1.5}rem`,
+                minHeight: "100%",
                 backgroundColor: EDITOR_BG,
               }}
             >
@@ -142,7 +146,7 @@ export default function CodeTab({
                   <div className="leading-6">1</div>
                 )}
               </div>
-              <div className="relative min-w-0 flex-1 overflow-auto">
+              <div className="relative min-w-0 flex-1 overflow-hidden">
                 <div
                   className="relative w-full"
                   style={{ minHeight: `${Math.max(1, lines.length) * 1.5}rem` }}
@@ -176,7 +180,7 @@ export default function CodeTab({
                     </SyntaxHighlighter>
                   </div>
                   <textarea
-                    className="relative block w-full min-w-0 resize-none border-0 bg-transparent font-mono placeholder:text-muted-foreground focus:ring-0 focus:outline-none"
+                    className="relative block w-full min-w-0 resize-none border-0 bg-transparent font-mono placeholder:text-muted-foreground focus:ring-0 focus:outline-none overflow-hidden"
                     value={code}
                     onChange={(e) => onCodeChange(e.target.value)}
                     spellCheck={false}
@@ -194,6 +198,7 @@ export default function CodeTab({
                       minHeight: `${Math.max(1, lines.length) * 1.5}rem`,
                       color: "transparent",
                       caretColor: CARET,
+                      overflow: "hidden",
                     }}
                   />
                 </div>

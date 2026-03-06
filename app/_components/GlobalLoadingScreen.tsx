@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PixelLoader } from "@/app/_components/PixelLoader";
+import Image from "next/image";
 import { cn } from "@/app/_libs/utils";
 
 const MIN_LOADING_MS = 600;
@@ -34,7 +34,15 @@ export function GlobalLoadingScreen({
         )}
         aria-hidden={ready}
       >
-        <PixelLoader label="Loading…" size={56} />
+        <Image
+          src="/images/img-claw.png"
+          alt="Loading"
+          width={120}
+          height={120}
+          className="animate-loading-claw object-contain"
+          priority
+          unoptimized
+        />
       </div>
       <div className={cn("transition-opacity duration-300", ready ? "opacity-100" : "opacity-0")}>
         {children}

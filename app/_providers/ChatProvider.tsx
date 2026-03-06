@@ -95,7 +95,6 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const handleEvent = useCallback(
     (event: { eventType: string; payload: Record<string, unknown> }) => {
       const { eventType, payload } = event;
-      console.log("event", event);
 
       if (payload.phase && typeof payload.phase === "string") {
         setPhase(PHASE_LABELS[payload.phase] ?? payload.phase.toUpperCase());
@@ -121,6 +120,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
               },
             ]);
           } else {
+            setLoading(false);
             const id = `msg-${payload.agentName as string}-${Date.now()}`;
             activeMessagesRef.current[payload.agentName as string] = id;
             setMessages((prev) => [
@@ -194,6 +194,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
         case "run.done": {
           const phase = payload.phase as string;
+          setLoading(false);
           if (phase === "awaiting_approval") {
             setApprovalData({
               message: payload.message as string,
@@ -254,19 +255,30 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
   const startDiscussion = useCallback(
     async (idea: string) => {
+      const trimmed = idea.trim();
+      if (!trimmed) return;
+
       setError(null);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `user-${Date.now()}`,
+          type: AgentMessageType.USER,
+          content: trimmed,
+        },
+      ]);
       setLoading(true);
 
       try {
-        const response = await mutateGetRunsId.mutateAsync({ idea, mode: "squad" });
+        const response = await mutateGetRunsId.mutateAsync({ idea: trimmed, mode: "squad" });
         if (!response.data?.id) throw new Error(response.message ?? "Failed to start discussion");
         runIdRef.current = response.data?.id;
         setRunId(response.data?.id);
         setStep(RunStep.CHAT);
         connectWebSocket(response.data?.id);
+        // Keep loading true until first agent message arrives via socket (agent.started)
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to start discussion");
-      } finally {
         setLoading(false);
       }
     },
@@ -276,6 +288,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const sendUserMessage = useCallback((content: string): string => {
     const id = `user-${Date.now()}`;
     if (!content.trim()) return id;
+    setLoading(true);
     setMessages((prev) => [...prev, { id, type: AgentMessageType.USER, content: content.trim() }]);
     return id;
   }, []);
@@ -307,12 +320,13 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             },
           ]);
           setStep(RunStep.CHAT);
+          // Keep loading true until first agent message arrives via socket (agent.started)
         } else {
           setStep(RunStep.IDLE);
+          setLoading(false);
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to continue");
-      } finally {
         setLoading(false);
       }
     },

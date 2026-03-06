@@ -1,9 +1,7 @@
 import { baseAPI } from "../_libs/api/axios";
-import { authAPI } from "../_libs/api/axiosAuth";
 import { ApiResponse } from "../_types/api";
 import {
   AuthNonceResponse,
-  AuthResponse,
   AuthVerifyRequest,
   AuthVerifyResponse,
 } from "../_types/auth";
@@ -16,11 +14,6 @@ export const AuthService = {
 
   async verify(data: AuthVerifyRequest): Promise<ApiResponse<AuthVerifyResponse>> {
     const response = await baseAPI.post<ApiResponse<AuthVerifyResponse>>("/auth/siws/verify", data);
-    return response.data;
-  },
-
-  async getUser(): Promise<ApiResponse<AuthResponse>> {
-    const response = await authAPI.get<ApiResponse<AuthResponse>>(`/auth`);
     return response.data;
   },
 };
