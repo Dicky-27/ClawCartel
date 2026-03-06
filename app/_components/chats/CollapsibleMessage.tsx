@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { Button } from "@/app/_components/ui/button";
 import { ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 import { cn } from "@/app/_libs/utils";
 
@@ -34,11 +33,9 @@ export function CollapsibleMessage({
       >
         {children}
       </div>
-      <Button
+      <button
         type="button"
-        variant="ghost"
-        size="sm"
-        className="text-muted-foreground hover:text-foreground -ml-1 h-7 gap-1 text-xs font-medium"
+        className="font-pp-neue-montreal-book text-muted-foreground hover:text-foreground -ml-1 mt-0.5 inline-flex items-center gap-1 text-xs transition-colors"
         onClick={() => setExpanded((e) => !e)}
       >
         {expanded ? (
@@ -52,7 +49,7 @@ export function CollapsibleMessage({
             Show more
           </>
         )}
-      </Button>
+      </button>
     </div>
   );
 }

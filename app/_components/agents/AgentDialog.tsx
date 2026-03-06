@@ -43,7 +43,7 @@ export function AgentDialog({
           <div className="min-w-0 flex-1 space-y-1.5">
             <DialogTitle className="text-lg">{agent.name}</DialogTitle>
             <DialogDescription className="text-muted-foreground text-sm leading-relaxed">
-              {agent.character}
+              {agent.description ?? agent.character}
             </DialogDescription>
           </div>
         </DialogHeader>

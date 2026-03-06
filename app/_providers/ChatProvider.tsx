@@ -21,6 +21,13 @@ import {
 import { ChatService } from "../_services/chat";
 import { useMutation } from "@tanstack/react-query";
 import { PHASE_LABELS } from "../_constant/chat";
+import { useAgents } from "./AgentsProvider";
+
+interface SocketAgentPayload {
+  id?: number;
+  name?: string;
+  role?: string;
+}
 
 interface ChatContextType {
   step: RunStep;
@@ -35,6 +42,8 @@ interface ChatContextType {
   stats: RunStats | null;
   fileCount: number;
   messageCount: number;
+  /** Last accumulated message per agent name, for map bubble chat */
+  agentBubbles: Record<string, string>;
   startDiscussion: (idea: string) => Promise<void>;
   sendUserMessage: (content: string) => string;
   removeMessage: (id: string) => void;
@@ -46,6 +55,7 @@ interface ChatContextType {
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
 export function ChatProvider({ children }: { children: React.ReactNode }) {
+  const { agents } = useAgents();
   const [step, setStep] = useState<RunStep>(RunStep.IDLE);
   const [messages, setMessages] = useState<AgentMessage[]>([]);
   const [isConnected, setIsConnected] = useState(false);
@@ -58,6 +68,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const [stats, setStats] = useState<RunStats | null>(null);
   const [fileCount, setFileCount] = useState(0);
   const [messageCount, setMessageCount] = useState(0);
+  const [agentBubbles, setAgentBubbles] = useState<Record<string, string>>({});
 
   // Refs for mutable values used inside callbacks without triggering re-renders
   const runIdRef = useRef<string | null>(null);
@@ -93,8 +104,24 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   }, [refreshFiles]);
 
   const handleEvent = useCallback(
-    (event: { eventType: string; payload: Record<string, unknown> }) => {
+    (
+      event: {
+        eventType: string;
+        payload: Record<string, unknown>;
+        agent?: SocketAgentPayload;
+      },
+    ) => {
       const { eventType, payload } = event;
+      const topLevelAgent = event.agent;
+      const agentName =
+        (topLevelAgent?.name as string | undefined) ??
+        (payload.agentName as string | undefined);
+      const agentId = topLevelAgent?.id;
+      const agentRole = topLevelAgent?.role as string | undefined;
+      const resolvedName =
+        (typeof agentName === "string" ? agentName : null) ||
+        (typeof agentId !== "undefined" ? agents.find((a) => a.id === `agent-${agentId}`)?.name : null);
+      const bubbleKey = resolvedName ?? `agent-${agentId ?? ""}`;
 
       if (payload.phase && typeof payload.phase === "string") {
         setPhase(PHASE_LABELS[payload.phase] ?? payload.phase.toUpperCase());
@@ -121,16 +148,18 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             ]);
           } else {
             setLoading(false);
-            const id = `msg-${payload.agentName as string}-${Date.now()}`;
-            activeMessagesRef.current[payload.agentName as string] = id;
+            const id = `msg-${bubbleKey}-${Date.now()}`;
+            activeMessagesRef.current[bubbleKey] = id;
             setMessages((prev) => [
               ...prev,
               {
                 id,
                 type: AgentMessageType.AGENT,
                 content: "",
-                agentName: payload.agentName as string,
-                agentEmoji: payload.agentEmoji as string,
+                agentName: bubbleKey,
+                agentEmoji: payload.agentEmoji as string | undefined,
+                agentId,
+                agentRole,
                 isDone: false,
                 phase,
               },
@@ -157,14 +186,19 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
           if (phase?.startsWith("round") || phase === "final") break;
 
-          const deltaTargetId = activeMessagesRef.current[payload.agentName as string];
+          const accumulated = payload.accumulated as string | undefined;
+          if (typeof accumulated === "string" && bubbleKey) {
+            setAgentBubbles((prev) => ({ ...prev, [bubbleKey]: accumulated }));
+          }
+
+          const deltaTargetId = activeMessagesRef.current[bubbleKey];
           if (deltaTargetId) {
             setMessages((prev) =>
               prev.map((m) =>
                 m.id === deltaTargetId
                   ? {
                       ...m,
-                      content: (payload.accumulated as string) || (payload.message as string),
+                      content: accumulated ?? (payload.message as string) ?? m.content,
                     }
                   : m,
               ),
@@ -177,7 +211,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
           const phase = payload.phase as string | undefined;
           if (phase?.startsWith("round") || phase === "final") break;
 
-          const doneTargetId = activeMessagesRef.current[payload.agentName as string];
+          const doneTargetId = activeMessagesRef.current[bubbleKey];
           if (doneTargetId) {
             setMessages((prev) =>
               prev.map((m) =>
@@ -187,7 +221,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
               ),
             );
             setMessageCount((c) => c + 1);
-            delete activeMessagesRef.current[payload.agentName as string];
+            delete activeMessagesRef.current[bubbleKey];
           }
           break;
         }
@@ -204,15 +238,17 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
           } else if (phase === "completed") {
             setStats((payload.stats as RunStats) ?? null);
             setStep(RunStep.COMPLETE);
+            setAgentBubbles({});
             refreshFilesRef.current();
           } else if (phase === "rejected") {
             setStep(RunStep.IDLE);
+            setAgentBubbles({});
           }
           break;
         }
       }
     },
-    [],
+    [agents],
   );
 
   const connectWebSocket = useCallback(
@@ -259,6 +295,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       if (!trimmed) return;
 
       setError(null);
+      setAgentBubbles({});
       setMessages((prev) => [
         ...prev,
         {
@@ -358,6 +395,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       stats,
       fileCount,
       messageCount,
+      agentBubbles,
       startDiscussion,
       sendUserMessage,
       removeMessage,
@@ -378,6 +416,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       stats,
       fileCount,
       messageCount,
+      agentBubbles,
       startDiscussion,
       sendUserMessage,
       removeMessage,

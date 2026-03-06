@@ -4,12 +4,13 @@ import * as React from "react";
 import { Button } from "@/app/_components/ui/button";
 import { ScrollArea } from "@/app/_components/ui/scroll-area";
 import { Textarea } from "@/app/_components/ui/textarea";
+import type { Agent } from "@/app/_data/agents";
+import { useAgents } from "@/app/_providers/AgentsProvider";
 import { useChat } from "@/app/_providers/ChatProvider";
 import { useSolana } from "@/app/_providers/SolanaProvider";
-import { cn, getAgentColorByName, shortenAddress } from "@/app/_libs/utils";
+import { cn, shortenAddress } from "@/app/_libs/utils";
 import { BotIcon, CheckIcon, LogOut, SendIcon, WalletIcon, XIcon } from "lucide-react";
 import { AgentDialog } from "@/app/_components/agents/AgentDialog";
-import type { Agent } from "@/app/_data/agents";
 import Image from "next/image";
 import { ChatBubble } from "./ChatBubble";
 
@@ -30,6 +31,7 @@ export function ChatPanel({
   onAgentDialogChange,
 }: ChatPanelProps) {
   const { isConnected: isWalletConnected, setOpen: setWalletOpen, selectedAccount } = useSolana();
+  const { agents } = useAgents();
 
   const {
     step,
@@ -137,6 +139,10 @@ export function ChatPanel({
 
               const isUser = m.type === "user";
               const label = isUser ? "You" : (m.agentName ?? "Agent");
+              const resolvedAgent: Agent | undefined =
+                !isUser && m.agentName
+                  ? agents.find((a) => a.name === m.agentName)
+                  : undefined;
 
               return (
                 <ChatBubble
@@ -146,6 +152,12 @@ export function ChatPanel({
                   imagePath={isUser ? "/images/img-user.png" : "/images/img-agent.png"}
                   content={m.content}
                   isUser={isUser}
+                  agent={resolvedAgent}
+                  onAvatarClick={
+                    resolvedAgent
+                      ? () => setAgentForDialog(resolvedAgent)
+                      : undefined
+                  }
                 />
               );
             })
@@ -157,40 +169,22 @@ export function ChatPanel({
               aria-live="polite"
               aria-label="Agent is thinking"
             >
-              <div className="flex items-center justify-between">
-                <Image
-                  src="/images/img-agent.png"
-                  alt="Agent"
-                  width={32}
-                  height={32}
-                  className="size-8 object-contain"
+              <div className="font-pp-neue-montreal-book text-foreground flex items-center gap-1.5 text-sm">
+                <span
+                  className="bg-primary h-2 w-2 animate-bounce rounded-full"
+                  style={{ animationDuration: "0.6s", animationDelay: "0ms" }}
+                  aria-hidden
                 />
-                <p className="text-muted-foreground font-pp-neue-montreal-book text-lg"> </p>
-              </div>
-              <div className="ml-1">
-                <h1
-                  className="font-pp-neue-montreal-bold mt-1 text-lg"
-                  style={{ color: getAgentColorByName("Agent") }}
-                >
-                  Agent
-                </h1>
-                <div className="font-pp-neue-montreal-book text-foreground mt-1 flex items-center gap-1.5 text-sm">
-                  <span
-                    className="bg-primary h-2 w-2 animate-bounce rounded-full"
-                    style={{ animationDuration: "0.6s", animationDelay: "0ms" }}
-                    aria-hidden
-                  />
-                  <span
-                    className="bg-primary h-2 w-2 animate-bounce rounded-full"
-                    style={{ animationDuration: "0.6s", animationDelay: "150ms" }}
-                    aria-hidden
-                  />
-                  <span
-                    className="bg-primary h-2 w-2 animate-bounce rounded-full"
-                    style={{ animationDuration: "0.6s", animationDelay: "300ms" }}
-                    aria-hidden
-                  />
-                </div>
+                <span
+                  className="bg-primary h-2 w-2 animate-bounce rounded-full"
+                  style={{ animationDuration: "0.6s", animationDelay: "150ms" }}
+                  aria-hidden
+                />
+                <span
+                  className="bg-primary h-2 w-2 animate-bounce rounded-full"
+                  style={{ animationDuration: "0.6s", animationDelay: "300ms" }}
+                  aria-hidden
+                />
               </div>
             </div>
           )}
@@ -198,38 +192,7 @@ export function ChatPanel({
         </div>
       </ScrollArea>
 
-      {/* Approval banner */}
-      {step === "approval" && approvalData && (
-        <div className="border-border/50 bg-muted/30 border-t p-3">
-          <p className="text-foreground mb-1 text-xs font-medium">{approvalData.message}</p>
-          <p className="text-muted-foreground mb-3 text-[11px]">
-            The squad has agreed on the approach. Ready to generate code?
-          </p>
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              className="flex-1"
-              onClick={() => continueToDevelopment(true)}
-              disabled={loading}
-            >
-              <CheckIcon className="mr-1.5 size-3.5" />
-              Approve &amp; Build
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="flex-1"
-              onClick={() => continueToDevelopment(false)}
-              disabled={loading}
-            >
-              <XIcon className="mr-1.5 size-3.5" />
-              Reject
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Input */}
+      {/* Input / Approval — same card area */}
       <div className="bg-card-secondary mx-5 mb-5 shrink-0 rounded-2xl border p-2 [box-shadow:-4px_-4px_0px_0px_#8A8483_inset]">
         {!isWalletConnected ? (
           <div className="text-muted-foreground flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed py-6 text-center text-sm">
@@ -242,6 +205,39 @@ export function ChatPanel({
             >
               Connect Wallet
             </Button>
+          </div>
+        ) : step === "approval" && approvalData ? (
+          <div className="p-2">
+            <p className="font-parabole text-foreground mb-0.5 text-sm uppercase tracking-wide">
+              Discussion complete
+            </p>
+            <p className="font-pp-neue-montreal-book text-foreground mb-1 text-sm">
+              {approvalData.message}
+            </p>
+            <p className="text-muted-foreground font-pp-neue-montreal-book mb-4 text-xs">
+              The squad has agreed on the approach. Ready to generate code?
+            </p>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                className="font-parabole flex-1 rounded-full"
+                onClick={() => continueToDevelopment(true)}
+                disabled={loading}
+              >
+                <CheckIcon className="mr-1.5 size-3.5" />
+                Approve &amp; Build
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="font-parabole flex-1 rounded-full"
+                onClick={() => continueToDevelopment(false)}
+                disabled={loading}
+              >
+                <XIcon className="mr-1.5 size-3.5" />
+                Reject
+              </Button>
+            </div>
           </div>
         ) : showInput ? (
           <div className="relative flex gap-2 bg-transparent">

@@ -14,12 +14,19 @@ const ROOM_BOUNDS = {
   y2: 17 * TILE_SIZE,
 };
 
-const AGENT_CONFIGS: Omit<MapAgentConfig, "bounds">[] = [
-  { textureKey: "npc-adam", name: "Adam", x: 4 * TILE_SIZE + 24, y: 5 * TILE_SIZE + 24 },
-  { textureKey: "npc-alex", name: "Alex", x: 8 * TILE_SIZE + 24, y: 7 * TILE_SIZE + 24 },
-  { textureKey: "npc-amelia", name: "Amelia", x: 14 * TILE_SIZE + 24, y: 5 * TILE_SIZE + 24 },
-  { textureKey: "npc-bob", name: "BOB", x: 18 * TILE_SIZE + 24, y: 9 * TILE_SIZE + 24 },
-];
+/** Fixed positions per agent name (from API). Map waits for fetched agents. */
+const AGENT_POSITIONS: Record<string, { x: number; y: number }> = {
+  Adam: { x: 4 * TILE_SIZE + 24, y: 5 * TILE_SIZE + 24 },
+  Alex: { x: 8 * TILE_SIZE + 24, y: 7 * TILE_SIZE + 24 },
+  Amelia: { x: 14 * TILE_SIZE + 24, y: 5 * TILE_SIZE + 24 },
+  BOB: { x: 18 * TILE_SIZE + 24, y: 9 * TILE_SIZE + 24 },
+};
+const DEFAULT_AGENT_POS = { x: 12 * TILE_SIZE + 24, y: 8 * TILE_SIZE + 24 };
+
+const MEETING_CENTER_X = 15 * TILE_SIZE + 24;
+const MEETING_CENTER_Y = 10 * TILE_SIZE + 24;
+const MEETING_RADIUS = 88;
+const MEETING_ANGLES = [0, 72, 144, 216, 288];
 
 const PLAYER_ANIM = {
   down: { start: 0, end: 5 },
@@ -59,9 +66,73 @@ export class GameScene extends Phaser.Scene {
   private interiorLayer!: Phaser.Tilemaps.TilemapLayer;
 
   private agents: MapAgent[] = [];
+  private agentBubbles: Record<string, string> = {};
+  private discussionMode = false;
 
   onPositionChange?: (x: number, y: number) => void;
   onAgentInteract?: (agentName: string) => void;
+
+  /** Set by PhaserGame so create() can read initial agents (scene not ready until create). */
+  agentsConfigRef?: { current: Array<{ name: string; textureKey: string }> | undefined };
+
+  setAgentBubbles(bubbles: Record<string, string>) {
+    this.agentBubbles = bubbles ?? {};
+  }
+
+  setDiscussionMode(on: boolean) {
+    if (this.discussionMode === on) return;
+    this.discussionMode = on;
+    const deg = (d: number) => (d * Math.PI) / 180;
+    this.agents.forEach((agent, i) => {
+      if (on) {
+        const a = deg(MEETING_ANGLES[i % MEETING_ANGLES.length]);
+        const x = MEETING_CENTER_X + MEETING_RADIUS * Math.cos(a);
+        const y = MEETING_CENTER_Y + MEETING_RADIUS * Math.sin(a);
+        agent.setMeetingTarget(x, y, MEETING_CENTER_X, MEETING_CENTER_Y, MEETING_RADIUS);
+      } else {
+        agent.setMeetingTarget(null);
+      }
+    });
+  }
+
+  /** Create/update map agents from API data. Only recreates when the list of names actually changes. */
+  setAgentConfigs(agents: Array<{ name: string; textureKey: string }>) {
+    const newNames = agents.map((a) => a.name).join(",");
+    const curNames = this.agents.map((a) => a.name).join(",");
+    if (newNames === curNames && this.agents.length === agents.length) return;
+
+    for (const a of this.agents) a.destroy();
+    this.agents = [];
+    const pos = (name: string) =>
+      AGENT_POSITIONS[name] ?? DEFAULT_AGENT_POS;
+    for (const a of agents) {
+      const { x, y } = pos(a.name);
+      const config: MapAgentConfig = {
+        textureKey: a.textureKey,
+        name: a.name,
+        x,
+        y,
+        bounds: ROOM_BOUNDS,
+      };
+      const agent = new MapAgent(this, config);
+      this.agents.push(agent);
+      agent.sprite.setInteractive({ useHandCursor: true });
+      agent.sprite.on(Phaser.Input.Events.POINTER_DOWN, () => {
+        this.onAgentInteract?.(a.name);
+      });
+      this.physics.add.collider(agent.sprite, this.wallLayer);
+      this.physics.add.collider(agent.sprite, this.interiorLayer);
+    }
+    if (this.discussionMode) {
+      const deg = (d: number) => (d * Math.PI) / 180;
+      this.agents.forEach((agent, i) => {
+        const a = deg(MEETING_ANGLES[i % MEETING_ANGLES.length]);
+        const x = MEETING_CENTER_X + MEETING_RADIUS * Math.cos(a);
+        const y = MEETING_CENTER_Y + MEETING_RADIUS * Math.sin(a);
+        agent.setMeetingTarget(x, y, MEETING_CENTER_X, MEETING_CENTER_Y, MEETING_RADIUS);
+      });
+    }
+  }
 
   private joystickVx = 0;
   private joystickVy = 0;
@@ -80,10 +151,11 @@ export class GameScene extends Phaser.Scene {
     this.buildTilemap();
     this.registerPlayerAnims();
     this.createPlayer();
-    this.createAgents();
     this.setupInput();
     this.setupCollisions();
     this.setupCamera();
+    // Create map agents from ref (set by PhaserGame); physics only exists after create()
+    this.setAgentConfigs(this.agentsConfigRef?.current ?? []);
 
     this.onPositionChange?.(this.player.x, this.player.y);
   }
@@ -91,7 +163,10 @@ export class GameScene extends Phaser.Scene {
   update(_time: number, delta: number) {
     this.handleMovement();
     this.syncNameTagPosition();
-    for (const agent of this.agents) agent.update(delta);
+    for (const agent of this.agents) {
+      agent.setBubbleText(this.agentBubbles[agent.name] ?? "");
+      agent.update(delta);
+    }
   }
 
   // ─── Tilemap ─────────────────────────────────────────────────────────────────
@@ -298,20 +373,6 @@ export class GameScene extends Phaser.Scene {
       // Stopped — freeze on the first frame of the last direction (idle pose)
       this.player.stop();
       this.player.setFrame(PLAYER_ANIM[this.lastDir].start);
-    }
-  }
-
-  // ─── Map agents ─────────────────────────────────────────────────────────────
-
-  private createAgents() {
-    for (const config of AGENT_CONFIGS) {
-      const agent = new MapAgent(this, { ...config, bounds: ROOM_BOUNDS });
-      this.agents.push(agent);
-      // Click agent → notify React (e.g. open agents panel)
-      agent.sprite.setInteractive({ useHandCursor: true });
-      agent.sprite.on(Phaser.Input.Events.POINTER_DOWN, () => {
-        this.onAgentInteract?.(config.name);
-      });
     }
   }
 

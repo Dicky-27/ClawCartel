@@ -15,8 +15,34 @@ type Direction = keyof typeof ANIM_FRAMES;
 const DIRECTIONS: Direction[] = ["down", "left", "right", "up"];
 
 const AGENT_SPEED   = 60;   // pixels per second — slow & casual
+const MEETING_ARRIVED_DIST = 8;
+const MEETING_LERP_FACTOR = 0.014;
+const MEETING_WANDER_RADIUS = 20;
+const MEETING_WANDER_INTERVAL_MS_MIN = 1800;
+const MEETING_WANDER_INTERVAL_MS_MAX = 3200;
+const MEETING_WANDER_LERP = 0.006;
 const FRAME_RATE  = 8;    // animation fps
 const SCALE       = 2.5;  // 16px × 2.5 = 40px visible — fits nicely with 48px tiles
+
+const BUBBLE_MAX_LINES = 6;
+const BUBBLE_LINE_HEIGHT = 12;
+const BUBBLE_PADDING = 6;
+const BUBBLE_PADDING_BOTTOM = 12;
+const BUBBLE_WIDTH = 140;
+const BUBBLE_DISMISS_MS = 10000;
+const BUBBLE_TAIL_WIDTH = 14;
+const BUBBLE_TAIL_HEIGHT = 10;
+const BUBBLE_MAX_CHARS = 115;
+
+/** Truncate to fit bubble (char limit + ellipsis) so word-wrap stays within ~6 lines. */
+function truncateToLines(text: string): string {
+  if (!text?.trim()) return "";
+  const trimmed = text.trim();
+  if (trimmed.length <= BUBBLE_MAX_CHARS) return trimmed;
+  const cut = trimmed.slice(0, BUBBLE_MAX_CHARS - 3);
+  const lastSpace = cut.lastIndexOf(" ");
+  return (lastSpace > 0 ? cut.slice(0, lastSpace) : cut).trim() + "...";
+}
 
 // How long (ms) an agent stays in each state before switching
 const MIN_WALK_MS = 1000;
@@ -31,23 +57,38 @@ export type MapAgentConfig = {
   name: string;
   x: number;
   y: number;
-  // Walkable area bounds (in pixels) — agent stays inside this box
   bounds: { x1: number; y1: number; x2: number; y2: number };
 };
 
 export class MapAgent {
   readonly sprite: Phaser.Physics.Arcade.Sprite;
   private label: Phaser.GameObjects.Text;
+  private bubbleBg: Phaser.GameObjects.Graphics | null = null;
+  private bubbleMask: Phaser.GameObjects.Graphics | null = null;
+  private bubbleText: Phaser.GameObjects.Text | null = null;
+  private bubbleDismissCountdownMs = 0;
+  private lastDismissedText = "";
 
   private state: AgentState = "idle";
   private direction: Direction = "down";
   private stateTimer = 0;   // counts down in ms
   private scene: Phaser.Scene;
   private bounds: MapAgentConfig["bounds"];
+  readonly name: string;
+  private homeX: number;
+  private homeY: number;
+  private meetingTarget: { x: number; y: number } | null = null;
+  private meetingCenter: { x: number; y: number } | null = null;
+  private meetingRadius: number | null = null;
+  private meetingWanderOffset = { x: 0, y: 0 };
+  private meetingWanderTimer = 0;
 
   constructor(scene: Phaser.Scene, config: MapAgentConfig) {
     this.scene = scene;
     this.bounds = config.bounds;
+    this.name = config.name;
+    this.homeX = config.x;
+    this.homeY = config.y;
 
     // ── Sprite ─────────────────────────────────────────────────────────────
     this.sprite = scene.physics.add.sprite(config.x, config.y, config.textureKey);
@@ -78,36 +119,232 @@ export class MapAgent {
     this.playIdle();
   }
 
+  /** When true, agent moves to meeting target and wanders within radius; when false, returns to normal wander. */
+  setMeetingTarget(x: number | null, y?: number, centerX?: number, centerY?: number, radius?: number) {
+    const body = this.sprite.body as Phaser.Physics.Arcade.Body;
+    if (x === null) {
+      this.meetingTarget = null;
+      this.meetingCenter = null;
+      this.meetingRadius = null;
+      this.meetingWanderOffset = { x: 0, y: 0 };
+      this.meetingWanderTimer = 0;
+      body.reset(this.sprite.x, this.sprite.y);
+      body.setEnable(true);
+      this.startIdle();
+      return;
+    }
+    this.meetingTarget = { x, y: y ?? this.sprite.y };
+    this.meetingCenter =
+      centerX != null && centerY != null ? { x: centerX, y: centerY } : null;
+    this.meetingRadius = radius ?? null;
+    this.meetingWanderOffset = { x: 0, y: 0 };
+    this.meetingWanderTimer = Phaser.Math.Between(0, MEETING_WANDER_INTERVAL_MS_MAX);
+    body.setEnable(false);
+  }
+
+  /** Set bubble chat text above the character; max 6 lines then "...". Empty string hides bubble. Auto-dismiss after 10s. */
+  setBubbleText(text: string) {
+    const display = truncateToLines(text);
+    if (!display) {
+      this.clearBubble();
+      this.lastDismissedText = "";
+      return;
+    }
+    if (!this.bubbleText && display === this.lastDismissedText) return;
+    if (!this.bubbleText) {
+      this.bubbleBg = this.scene.add.graphics().setDepth(11);
+      this.bubbleMask = this.scene.add.graphics();
+      this.bubbleText = this.scene.add
+        .text(0, 0, display, {
+          fontSize: "10px",
+          color: "#1a1a1a",
+          fontFamily: "monospace",
+          wordWrap: { width: BUBBLE_WIDTH - BUBBLE_PADDING * 2 },
+          align: "left",
+        })
+        .setOrigin(0, 0)
+        .setDepth(12);
+      this.bubbleText.setMask(this.bubbleMask.createGeometryMask());
+      this.bubbleDismissCountdownMs = BUBBLE_DISMISS_MS;
+    } else {
+      if (this.bubbleText.text !== display) {
+        this.bubbleText.setText(display);
+      }
+      this.bubbleDismissCountdownMs = BUBBLE_DISMISS_MS;
+    }
+    this.syncBubblePosition();
+  }
+
+  private clearBubble() {
+    if (this.bubbleBg) {
+      this.bubbleBg.destroy();
+      this.bubbleBg = null;
+    }
+    if (this.bubbleMask) {
+      this.bubbleMask.destroy();
+      this.bubbleMask = null;
+    }
+    if (this.bubbleText) {
+      this.lastDismissedText = this.bubbleText.text;
+      this.bubbleText.destroy();
+      this.bubbleText = null;
+    }
+    this.bubbleDismissCountdownMs = 0;
+  }
+
+  private syncBubblePosition() {
+    const bg = this.bubbleBg;
+    const mask = this.bubbleMask;
+    const bt = this.bubbleText;
+    if (!bg || !bt) return;
+    const w = BUBBLE_WIDTH;
+    const h =
+      BUBBLE_MAX_LINES * BUBBLE_LINE_HEIGHT +
+      BUBBLE_PADDING +
+      BUBBLE_PADDING_BOTTOM;
+    const x = this.sprite.x;
+    const bubbleBottom = this.sprite.y - 28 - 14;
+    const top = bubbleBottom - h;
+    const left = x - w / 2;
+    const tailTop = bubbleBottom;
+    const tailLeft = x - BUBBLE_TAIL_WIDTH / 2;
+    const tailRight = x + BUBBLE_TAIL_WIDTH / 2;
+    const tailTip = tailTop + BUBBLE_TAIL_HEIGHT;
+
+    bg.clear();
+    bg.fillStyle(0xffffff, 0.95);
+    bg.fillRoundedRect(left, top, w, h, 4);
+    bg.fillTriangle(tailLeft, tailTop, tailRight, tailTop, x, tailTip);
+    bg.lineStyle(1, 0xcccccc, 0.8);
+    bg.strokeRoundedRect(left, top, w, h, 4);
+    bg.lineBetween(tailLeft, tailTop, x, tailTip);
+    bg.lineBetween(x, tailTip, tailRight, tailTop);
+
+    if (mask) {
+      mask.clear();
+      mask.fillStyle(0xffffff, 1);
+      mask.fillRoundedRect(left, top, w, h, 4);
+      mask.fillTriangle(tailLeft, tailTop, tailRight, tailTop, x, tailTip);
+    }
+
+    bt.setPosition(left + BUBBLE_PADDING, top + BUBBLE_PADDING);
+  }
+
   // ─── Called every frame from GameScene.update() ──────────────────────────
 
   update(delta: number) {
-    this.stateTimer -= delta;
+    const body = this.sprite.body as Phaser.Physics.Arcade.Body;
 
-    if (this.stateTimer <= 0) {
-      // Toggle between walking and idle
-      if (this.state === "idle") {
-        this.startWalking();
+    if (this.meetingTarget) {
+      body.setVelocity(0, 0);
+      body.setEnable(false);
+      const dx = this.meetingTarget.x - this.sprite.x;
+      const dy = this.meetingTarget.y - this.sprite.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist <= MEETING_ARRIVED_DIST) {
+        this.meetingWanderTimer -= delta;
+        if (this.meetingWanderTimer <= 0) {
+          const angle = Phaser.Math.FloatBetween(0, Math.PI * 2);
+          const r = Phaser.Math.FloatBetween(0, MEETING_WANDER_RADIUS);
+          this.meetingWanderOffset.x = Math.cos(angle) * r;
+          this.meetingWanderOffset.y = Math.sin(angle) * r;
+          this.meetingWanderTimer = Phaser.Math.Between(
+            MEETING_WANDER_INTERVAL_MS_MIN,
+            MEETING_WANDER_INTERVAL_MS_MAX,
+          );
+        }
+        let wx = this.meetingTarget.x + this.meetingWanderOffset.x;
+        let wy = this.meetingTarget.y + this.meetingWanderOffset.y;
+        if (this.meetingCenter && this.meetingRadius != null) {
+          const cdx = wx - this.meetingCenter.x;
+          const cdy = wy - this.meetingCenter.y;
+          const cdist = Math.sqrt(cdx * cdx + cdy * cdy);
+          if (cdist > this.meetingRadius) {
+            const scale = this.meetingRadius / cdist;
+            wx = this.meetingCenter.x + cdx * scale;
+            wy = this.meetingCenter.y + cdy * scale;
+          }
+        }
+        const wdx = wx - this.sprite.x;
+        const wdy = wy - this.sprite.y;
+        const wdist = Math.sqrt(wdx * wdx + wdy * wdy);
+        if (wdist > 0.5) {
+          const factor = 1 - Math.exp(-delta * MEETING_WANDER_LERP);
+          this.sprite.x += wdx * factor;
+          this.sprite.y += wdy * factor;
+          if (Math.abs(wdy) >= Math.abs(wdx)) this.direction = wdy > 0 ? "down" : "up";
+          else this.direction = wdx > 0 ? "right" : "left";
+          this.sprite.play(
+            `${this.sprite.texture.key}-walk-${this.direction}`,
+            true,
+          );
+        } else if (this.meetingCenter) {
+          const cx = this.meetingCenter.x - this.sprite.x;
+          const cy = this.meetingCenter.y - this.sprite.y;
+          if (Math.abs(cy) >= Math.abs(cx)) this.direction = cy > 0 ? "down" : "up";
+          else this.direction = cx > 0 ? "right" : "left";
+          this.playIdle();
+        } else {
+          this.direction = "down";
+          this.playIdle();
+        }
       } else {
-        this.startIdle();
+        const factor = 1 - Math.exp(-delta * MEETING_LERP_FACTOR);
+        this.sprite.x += dx * factor;
+        this.sprite.y += dy * factor;
+        if (Math.abs(dy) >= Math.abs(dx)) this.direction = dy > 0 ? "down" : "up";
+        else this.direction = dx > 0 ? "right" : "left";
+        this.sprite.play(
+          `${this.sprite.texture.key}-walk-${this.direction}`,
+          true,
+        );
+      }
+      this.label.setPosition(this.sprite.x, this.sprite.y - 28);
+      if (this.bubbleBg && this.bubbleText) {
+        if (this.bubbleDismissCountdownMs > 0) {
+          this.bubbleDismissCountdownMs -= delta;
+          if (this.bubbleDismissCountdownMs <= 0) this.clearBubble();
+          else this.syncBubblePosition();
+        } else {
+          this.syncBubblePosition();
+        }
+      }
+      return;
+    }
+
+    this.stateTimer -= delta;
+    if (this.stateTimer <= 0) {
+      if (this.state === "idle") this.startWalking();
+      else this.startIdle();
+    }
+
+    this.label.setPosition(this.sprite.x, this.sprite.y - 28);
+
+    if (this.bubbleBg && this.bubbleText) {
+      if (this.bubbleDismissCountdownMs > 0) {
+        this.bubbleDismissCountdownMs -= delta;
+        if (this.bubbleDismissCountdownMs <= 0) this.clearBubble();
+        else this.syncBubblePosition();
+      } else {
+        this.syncBubblePosition();
       }
     }
 
-    // Sync label above sprite
-    this.label.setPosition(this.sprite.x, this.sprite.y - 28);
-
-    // If agent walked into a wall (velocity blocked by physics), pick a new direction
     if (this.state === "walking") {
-      const body = this.sprite.body as Phaser.Physics.Arcade.Body;
-      const blocked = body.blocked.left || body.blocked.right ||
-                      body.blocked.up   || body.blocked.down;
+      const blocked =
+        body.blocked.left ||
+        body.blocked.right ||
+        body.blocked.up ||
+        body.blocked.down;
       if (blocked) this.startWalking();
-
-      // If agent walked out of bounds, reverse
       this.clampToBounds();
     }
   }
 
   destroy() {
+    this.bubbleBg?.destroy();
+    this.bubbleMask?.destroy();
+    this.bubbleText?.destroy();
     this.sprite.destroy();
     this.label.destroy();
   }

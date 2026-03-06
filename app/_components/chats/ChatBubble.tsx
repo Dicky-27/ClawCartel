@@ -1,3 +1,4 @@
+import type { Agent } from "@/app/_data/agents";
 import { cn, getAgentColorByName } from "@/app/_libs/utils";
 import Image from "next/image";
 import { TypewriterText } from "./TypewriterText";
@@ -10,15 +11,20 @@ export function ChatBubble({
   imagePath,
   content,
   isUser,
+  agent,
+  onAvatarClick,
 }: {
   name: string;
   date: string;
   imagePath: string;
   content: string;
   isUser: boolean;
+  agent?: Agent | null;
+  onAvatarClick?: () => void;
 }) {
   const agentColor = getAgentColorByName(name);
   const safeContent = content || "";
+  const isAvatarClickable = !isUser && agent != null && onAvatarClick != null;
 
   const messageBody = isUser ? (
     <MarkdownContent>{safeContent}</MarkdownContent>
@@ -38,16 +44,31 @@ export function ChatBubble({
     </TypewriterText>
   );
 
+  const avatarNode = (
+    <Image
+      src={imagePath}
+      alt={isUser ? "You" : agent?.name ?? "Agent"}
+      width={32}
+      height={32}
+      className={cn("size-8 object-contain", isAvatarClickable && "cursor-pointer")}
+    />
+  );
+
   return (
     <div className={cn("flex w-full flex-col items-start", isUser && "items-end")}>
       <div className={cn("flex items-center justify-between", isUser && "flex-row-reverse")}>
-        <Image
-          src={imagePath}
-          alt="agent"
-          width={32}
-          height={32}
-          className="size-8 object-contain"
-        />
+        {isAvatarClickable ? (
+          <button
+            type="button"
+            onClick={onAvatarClick}
+            className="shrink-0 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            aria-label={`View ${agent?.name ?? name} profile`}
+          >
+            {avatarNode}
+          </button>
+        ) : (
+          avatarNode
+        )}
         <p className="font-pp-neue-montreal-book text-muted-foreground text-lg">{date}</p>
       </div>
 

@@ -1,4 +1,5 @@
 import { TooltipProvider } from "./_components/ui/tooltip";
+import { AgentsProvider } from "./_providers/AgentsProvider";
 import { AuthProvider } from "./_providers/AuthProvider";
 import { ChatProvider } from "./_providers/ChatProvider";
 import { QueryProvider } from "./_providers/QueryProvider";
@@ -19,6 +20,7 @@ const AppProviders = composeProviders([
   SolanaProvider,
   AuthProvider,
   TooltipProvider,
+  AgentsProvider,
   ChatProvider,
 ]);
 

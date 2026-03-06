@@ -18,6 +18,8 @@ export interface AgentMessage {
   content: string;
   agentName?: string;
   agentEmoji?: string;
+  agentId?: number;
+  agentRole?: string;
   isDone?: boolean;
   phase?: string;
   createdAt?: string;

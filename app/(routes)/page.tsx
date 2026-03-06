@@ -6,8 +6,9 @@ import { useMediaQuery } from "@/app/_hooks/useMediaQuery";
 import type { GameScene } from "@/app/_libs/game/GameScene";
 import { IdeLayout } from "@/app/_components/IdeLayout";
 import { PixelatedLoadingScreen } from "@/app/_components/ui/PixelatedLoadingScreen";
-import { getAgentByName } from "@/app/_data/agents";
 import type { Agent } from "@/app/_data/agents";
+import { useAgents } from "@/app/_providers/AgentsProvider";
+import { useChat } from "@/app/_providers/ChatProvider";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Builder from "../_components/builders/Builder";
@@ -26,15 +27,21 @@ export default function IdeLayoutPage() {
   const [agentForDialog, setAgentForDialog] = useState<Agent | null>(null);
   const [isMobileSheetOpen, setMobileSheetOpen] = useState(false);
   const isMobileViewport = useMediaQuery(MOBILE_VIEWPORT);
+  const { agents } = useAgents();
+  const { step, runId, agentBubbles } = useChat();
+  const discussionMode = step === "chat" && !!runId;
 
   const handlePositionChange = useCallback((x: number, y: number) => {
     setCoords({ x: Math.round(x), y: Math.round(y) });
   }, []);
 
-  const handleAgentInteract = useCallback((agentName: string) => {
-    const agent = getAgentByName(agentName);
-    if (agent) setAgentForDialog(agent);
-  }, []);
+  const handleAgentInteract = useCallback(
+    (agentName: string) => {
+      const agent = agents.find((a) => a.name === agentName);
+      if (agent) setAgentForDialog(agent);
+    },
+    [agents],
+  );
 
   const handleJoystickMove = useCallback((nx: number, ny: number) => {
     sceneRef.current?.setJoystickInput(nx, -ny);
@@ -69,7 +76,13 @@ export default function IdeLayoutPage() {
           centerClassName="p-6"
         >
           <div className="absolute inset-0">
-            <PhaserGame onPositionChange={handlePositionChange} sceneRef={sceneRef} />
+            <PhaserGame
+              onPositionChange={handlePositionChange}
+              sceneRef={sceneRef}
+              agentBubbles={agentBubbles}
+              agents={agents.map((a) => ({ name: a.name, textureKey: a.textureKey }))}
+              discussionMode={discussionMode}
+            />
             <div className="pointer-events-none absolute top-12 left-1/2 -translate-x-1/2 font-mono text-xs text-white/40">
               {coords.x}, {coords.y}
             </div>

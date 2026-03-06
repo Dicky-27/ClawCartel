@@ -4,16 +4,40 @@ import { useEffect, useRef } from "react";
 import type * as Phaser from "phaser";
 import type { GameScene } from "../../_libs/game/GameScene";
 
+type AgentConfig = { name: string; textureKey: string };
+
 type Props = {
   /** Called every time the local player moves — wire to socket in Phase 3 */
   onPositionChange?: (x: number, y: number) => void;
   /** Ref forwarded so parent components can call scene methods (e.g. upsertRemotePlayer) */
   sceneRef?: React.RefObject<GameScene | null>;
+  /** Last message per agent name for map bubble chat */
+  agentBubbles?: Record<string, string>;
+  /** Agents from API; map waits for this before showing NPCs */
+  agents?: AgentConfig[];
+  /** When true, agents gather at meeting spot (discussion); when false, they wander */
+  discussionMode?: boolean;
 };
 
-export function PhaserGame({ onPositionChange, sceneRef }: Props) {
+export function PhaserGame({
+  onPositionChange,
+  sceneRef,
+  agentBubbles,
+  agents = [],
+  discussionMode = false,
+}: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const gameRef = useRef<Phaser.Game | null>(null);
+  const agentBubblesRef = useRef<Record<string, string>>(agentBubbles ?? {});
+  const agentsRef = useRef<AgentConfig[]>(agents);
+
+  useEffect(() => {
+    agentBubblesRef.current = agentBubbles ?? {};
+  }, [agentBubbles]);
+
+  useEffect(() => {
+    agentsRef.current = agents;
+  }, [agents]);
 
   useEffect(() => {
     // Track whether the cleanup already ran so we can cancel a pending async init.
@@ -40,6 +64,8 @@ export function PhaserGame({ onPositionChange, sceneRef }: Props) {
 
       const gameScene = new GameScene();
       gameScene.onPositionChange = onPositionChange;
+      gameScene.setAgentBubbles(agentBubblesRef.current ?? {});
+      gameScene.agentsConfigRef = agentsRef;
       if (sceneRef) sceneRef.current = gameScene;
 
       const game = new Phaser.Game({
@@ -82,6 +108,18 @@ export function PhaserGame({ onPositionChange, sceneRef }: Props) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    sceneRef?.current?.setAgentBubbles(agentBubbles ?? {});
+  }, [agentBubbles, sceneRef]);
+
+  useEffect(() => {
+    sceneRef?.current?.setAgentConfigs(agents);
+  }, [agents, sceneRef]);
+
+  useEffect(() => {
+    sceneRef?.current?.setDiscussionMode(!!discussionMode);
+  }, [discussionMode, sceneRef]);
 
   return (
     <div

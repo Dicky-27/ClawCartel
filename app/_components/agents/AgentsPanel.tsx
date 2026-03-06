@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import { AgentCard } from "@/app/_components/agents/AgentCard";
-import { AGENTS, type Agent } from "@/app/_data/agents";
+import { useAgents } from "@/app/_providers/AgentsProvider";
+import type { Agent } from "@/app/_data/agents";
 import { cn } from "@/app/_libs/utils";
 import { BotIcon } from "lucide-react";
 
@@ -17,6 +18,7 @@ export function AgentsPanel({
   onSelectAgent,
   className,
 }: AgentsPanelProps) {
+  const { agents } = useAgents();
   return (
     <div className={cn("flex flex-col", className)}>
       <div className="border-border flex items-center gap-2 border-b px-3 py-2">
@@ -24,7 +26,7 @@ export function AgentsPanel({
         <h2 className="font-geist-semi-bold text-foreground text-sm font-semibold">Agents</h2>
       </div>
       <div className="flex flex-col gap-1.5 p-2">
-        {AGENTS.map((agent) => (
+        {agents.map((agent) => (
           <AgentCard
             key={agent.id}
             agent={agent}

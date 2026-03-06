@@ -43,15 +43,15 @@ function PreviewLoading({ status }: { status: WebContainerStatus }) {
           {/* Bouncing dots */}
           <div className="flex h-full items-center justify-center gap-1.5">
             <span
-              className="bg-primary h-2 w-2 animate-bounce rounded-full"
+              className="bg-text-primary h-2 w-2 animate-bounce rounded-full"
               style={{ animationDuration: "0.6s", animationDelay: "0ms" }}
             />
             <span
-              className="bg-primary h-2 w-2 animate-bounce rounded-full"
+              className="bg-text-primary h-2 w-2 animate-bounce rounded-full"
               style={{ animationDuration: "0.6s", animationDelay: "150ms" }}
             />
             <span
-              className="bg-primary h-2 w-2 animate-bounce rounded-full"
+              className="bg-text-primary h-2 w-2 animate-bounce rounded-full"
               style={{ animationDuration: "0.6s", animationDelay: "300ms" }}
             />
           </div>
