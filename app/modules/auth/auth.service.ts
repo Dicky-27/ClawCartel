@@ -24,6 +24,23 @@ const AuthService = {
       )
     }
 
+    // Reuse existing unexpired nonce to make SIWS init idempotent per wallet
+    const existingNonce = await db.authNonce.findUnique({
+      where: { address },
+    })
+
+    if (existingNonce) {
+      if (existingNonce.expiresAt > new Date()) {
+        return {
+          nonce: existingNonce.nonce,
+          message: existingNonce.message,
+          expiresAt: existingNonce.expiresAt,
+        }
+      }
+
+      await db.authNonce.delete({ where: { id: existingNonce.id } })
+    }
+
     // Generate a cryptographically secure random nonce
     const nonce = crypto.randomBytes(32).toString('base64')
     const expiresAt = new Date(Date.now() + NONCE_EXPIRY_MINUTES * 60 * 1000)
