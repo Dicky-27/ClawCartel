@@ -61,14 +61,6 @@ export default function IdeLayoutPage() {
               onAgentsPanelOpenChange={setAgentsPanelOpen}
               agentForDialog={agentForDialog}
               onAgentDialogChange={setAgentForDialog}
-              emptyPlaceholder={
-                <>
-                  <p>Start a conversation</p>
-                  <p className="mt-1 text-xs">
-                    Describe your project idea to kick off the agent discussion.
-                  </p>
-                </>
-              }
             />
           }
           right={<Builder />}

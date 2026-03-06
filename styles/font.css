@@ -45,18 +45,15 @@
 
 @font-face {
   font-family: "PpNeueMontreal-Bold";
-  src: url("/fonts/ppnuemontreal-bold.ttf");
+  src: url("/fonts/ppneuemontreal-bold.otf");
 }
 
 @font-face {
   font-family: "PpNeueMontreal-Book";
-  src: url("/fonts/ppneuemontreal-book.ttf");
+  src: url("/fonts/ppneuemontreal-book.otf");
 }
 
 @font-face {
   font-family: "PixChicago";
-  src: url("/fonts/pixChicago.ttf") format("truetype");
-  font-weight: normal;
-  font-style: normal;
-  font-display: swap;
+  src: url("/fonts/pixChicago.ttf");
 }

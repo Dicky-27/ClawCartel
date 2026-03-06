@@ -19,9 +19,13 @@ export function AppHeader({ className }: { className?: string }) {
           height={500}
           className="absolute top-0 w-64 object-contain"
         />
-        <p className="font-pixeloid-sans-bold text-primary relative pt-1 text-sm font-bold">
-          ClawCartel
-        </p>
+        <Image
+          src="/images/img-claw.png"
+          alt="Claw Cartel"
+          width={500}
+          height={500}
+          className="relative mt-1 h-auto w-full max-w-24 object-contain"
+        />
       </div>
     </header>
   );

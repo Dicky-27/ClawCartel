@@ -39,7 +39,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning className="h-full">
+    <html lang="en" suppressHydrationWarning className="dark h-full">
       <head />
       <body className="h-full min-h-screen font-sans" suppressHydrationWarning>
         <Providers>

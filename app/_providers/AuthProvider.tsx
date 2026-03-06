@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import {
   createContext,
   useContext,
@@ -37,12 +37,10 @@ const MWA_WALLET_NAME = "Mobile Wallet Adapter";
 interface AuthContextType {
   user?: AuthResponse;
   isAuthenticated: boolean;
-  refetchUser: () => void;
   getNonce: (address: string) => Promise<ApiResponse<AuthNonceResponse>>;
   verify: (data: AuthVerifyRequest) => Promise<ApiResponse<AuthVerifyResponse>>;
   isGettingNonce: boolean;
   isVerifying: boolean;
-  isGettingUser: boolean;
   authenticate: () => Promise<void>;
 }
 
@@ -90,16 +88,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     onError: (error) => {
       console.error(error);
     },
-  });
-
-  const {
-    data: user,
-    isLoading: isGettingUser,
-    refetch: refetchUser,
-  } = useQuery({
-    queryKey: ["user"],
-    queryFn: AuthService.getUser,
-    enabled: isAuthenticated,
   });
 
   const authenticate = useCallback(async () => {
@@ -169,7 +157,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         !token &&
         !isAuthenticated &&
         !isVerifying &&
-        !isGettingUser &&
         !hasTriggeredAuth.current &&
         signMessage
       ) {
@@ -192,7 +179,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     walletAddress,
     isAuthenticated,
     isVerifying,
-    isGettingUser,
     signMessage,
     authenticate,
     isMobileOrMwa,
@@ -260,25 +246,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo(
     () => ({
-      user: user?.data,
       isAuthenticated,
-      refetchUser,
       getNonce,
       verify,
       isGettingNonce,
       isVerifying,
-      isGettingUser,
       authenticate,
     }),
     [
-      user?.data,
       isAuthenticated,
       getNonce,
       verify,
       isGettingNonce,
       isVerifying,
-      isGettingUser,
-      refetchUser,
       authenticate,
     ],
   );

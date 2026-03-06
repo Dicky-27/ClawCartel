@@ -20,6 +20,7 @@ export interface AgentMessage {
   agentEmoji?: string;
   isDone?: boolean;
   phase?: string;
+  createdAt?: string;
 }
 
 export interface FileNode {

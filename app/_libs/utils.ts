@@ -107,6 +107,13 @@ const SOLANA_PALETTE: [string, string][] = [
   ["#22D3EE", "#164E63"], // cyan-400
 ];
 
+const AGENT_COLORS = [
+  "#1C34D1", // BLUE
+  "#B70BAE", // PINK
+  "#A77319", // YELLOW
+  "#15803D", // GREEN
+];
+
 /**
  * Primary-themed stable color for an id (wallet, user). Green/teal range.
  */
@@ -121,4 +128,13 @@ export function truncateId(id: string, start = 4, end = 4): string {
   const s = String(id);
   if (s.length <= start + end) return s;
   return `${s.slice(0, start)}…${s.slice(-end)}`;
+}
+
+export function shortenAddress(address: string): string {
+  return `${address.slice(0, 4)}…${address.slice(-4)}`;
+}
+
+export function getAgentColorByName(name: string): string {
+  const index = hashString(String(name)) % AGENT_COLORS.length;
+  return AGENT_COLORS[index];
 }

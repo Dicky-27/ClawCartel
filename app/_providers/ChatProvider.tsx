@@ -95,7 +95,6 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const handleEvent = useCallback(
     (event: { eventType: string; payload: Record<string, unknown> }) => {
       const { eventType, payload } = event;
-      console.log("event", event);
 
       if (payload.phase && typeof payload.phase === "string") {
         setPhase(PHASE_LABELS[payload.phase] ?? payload.phase.toUpperCase());
@@ -254,11 +253,22 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
   const startDiscussion = useCallback(
     async (idea: string) => {
+      const trimmed = idea.trim();
+      if (!trimmed) return;
+
       setError(null);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `user-${Date.now()}`,
+          type: AgentMessageType.USER,
+          content: trimmed,
+        },
+      ]);
       setLoading(true);
 
       try {
-        const response = await mutateGetRunsId.mutateAsync({ idea, mode: "squad" });
+        const response = await mutateGetRunsId.mutateAsync({ idea: trimmed, mode: "squad" });
         if (!response.data?.id) throw new Error(response.message ?? "Failed to start discussion");
         runIdRef.current = response.data?.id;
         setRunId(response.data?.id);

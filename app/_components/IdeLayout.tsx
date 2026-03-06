@@ -224,13 +224,13 @@ export function IdeLayout({
                   role="separator"
                   aria-orientation="vertical"
                   onMouseDown={handleLeftDragStart}
-                  className="hover:bg-primary/30 active:bg-primary/50 absolute top-0 bottom-0 z-20 my-5 ml-2 w-1 cursor-col-resize rounded-full"
+                  className="hover:bg-background-secondary active:bg-background-secondary absolute top-0 bottom-0 z-20 my-5 ml-2 w-1 cursor-col-resize rounded-full"
                   style={{ left: leftWidth + PANEL_INSET }}
                   aria-label="Resize left panel"
                 />
                 <div
                   className={cn(
-                    "bg-card border-border absolute top-0 bottom-0 left-0 z-10 m-2 flex flex-col overflow-hidden rounded-xl border shadow-sm",
+                    "bg-card border-border absolute top-0 bottom-0 left-0 z-10 m-2 flex flex-col overflow-hidden rounded-2xl border",
                     leftClassName,
                   )}
                   style={{ width: leftWidth }}
@@ -238,22 +238,24 @@ export function IdeLayout({
                   <button
                     type="button"
                     onClick={() => setLeftWidth(0)}
-                    className="text-muted-foreground hover:bg-muted hover:text-foreground absolute top-2 right-2 z-10 rounded p-1.5"
+                    className="text-foreground hover:bg-muted hover:text-primary absolute top-4 right-2 z-10 rounded p-1.5"
                     aria-label="Hide left panel"
                   >
                     <PanelLeftCloseIcon className="size-4" />
                   </button>
-                  <div className="bg-card min-h-0 flex-1 overflow-auto">{left}</div>
+                  <div className="bg-card min-h-0 flex-1 overflow-auto rounded-xl [box-shadow:6px_6px_0px_0px_#827B79_inset]">
+                    {left}
+                  </div>
                 </div>
               </>
             ) : (
               <button
                 type="button"
                 onClick={() => setLeftWidth(defaultLeftSize)}
-                className="border-border bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground absolute top-0 left-0 z-10 my-2 ml-2 flex h-[calc(100%-1rem)] w-6 flex-col items-center justify-center gap-1 rounded-r-xl border border-l-0 transition-colors"
+                className="border-border bg-background/50 hover:bg-muted text-muted-foreground hover:text-foreground absolute top-0 left-0 z-10 my-2 ml-2 flex h-[calc(100%-1rem)] w-6 flex-col items-center justify-center gap-1 rounded-full border border-l-0 transition-colors"
                 aria-label="Show left panel"
               >
-                <PanelLeftIcon className="size-4" />
+                <PanelLeftIcon className="text-primary size-4" />
               </button>
             ))}
 
@@ -264,7 +266,7 @@ export function IdeLayout({
                   role="separator"
                   aria-orientation="vertical"
                   onMouseDown={handleRightDragStart}
-                  className="hover:bg-primary/30 active:bg-primary/50 absolute top-0 bottom-0 z-20 my-5 mr-2 w-1 cursor-col-resize rounded-full"
+                  className="hover:bg-background-secondary active:bg-background-secondary absolute top-0 bottom-0 z-20 my-5 mr-2 w-1 cursor-col-resize rounded-full"
                   style={{ right: rightWidth }}
                   aria-label="Resize right panel"
                 />
@@ -290,10 +292,10 @@ export function IdeLayout({
               <button
                 type="button"
                 onClick={() => setRightWidth(defaultRightWidth)}
-                className="border-border bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground absolute top-0 right-0 z-10 my-2 mr-2 flex h-[calc(100%-1rem)] w-6 flex-col items-center justify-center gap-1 rounded-l-xl border border-r-0 transition-colors"
+                className="border-border bg-background/50 hover:bg-muted text-muted-foreground hover:text-foreground absolute top-0 right-0 z-10 my-2 mr-2 flex h-[calc(100%-1rem)] w-6 flex-col items-center justify-center gap-1 rounded-full border border-r-0 transition-colors"
                 aria-label="Show right panel"
               >
-                <PanelRightIcon className="size-4" />
+                <PanelRightIcon className="text-primary size-4" />
               </button>
             ))}
         </div>

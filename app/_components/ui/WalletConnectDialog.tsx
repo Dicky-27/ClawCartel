@@ -49,9 +49,9 @@ function DisconnectButton() {
       variant="outline"
       onClick={handleDisconnect}
       disabled={disconnecting || isLoading || isSigning}
-      className="font-geist-medium gap-2"
+      className="font-parabole text-text-primary gap-2"
     >
-      <LogOutIcon className="size-4" />
+      <LogOutIcon className="text-text-primary size-4" />
       {isSigning ? "Signing…" : disconnecting ? "Disconnecting…" : "Disconnect"}
     </Button>
   );
@@ -63,11 +63,11 @@ function SignInButton() {
 
   return (
     <Button
-      className="font-geist-medium gap-2"
+      className="font-parabole bg-background-secondary gap-2"
       onClick={() => authenticate().catch(console.error)}
       disabled={isVerifying || isSigning}
     >
-      <LogInIcon className="size-4" />
+      <LogInIcon className="text-primary size-4" />
       {isVerifying || isSigning ? "Signing in…" : "Sign in"}
     </Button>
   );
@@ -100,10 +100,10 @@ export function WalletConnectDialog() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent>
+      <DialogContent className={"bg-card rounded-2xl [box-shadow:6px_6px_0px_0px_#827B79_inset]"}>
         <DialogHeader>
-          <DialogTitle className="text-center font-geist-semi-bold text-xl font-semibold">Connected Wallet</DialogTitle>
-          <DialogDescription className="text-center">
+          <DialogTitle className="font-parabole text-center text-xl">Connected Wallet</DialogTitle>
+          <DialogDescription className="font-pp-neue-montreal-book text-muted-foreground text-center text-sm">
             {isAuthenticated
               ? "You are connected with the following wallet."
               : "Sign in with your wallet to use the app."}
@@ -115,13 +115,13 @@ export function WalletConnectDialog() {
           selectedWallet &&
           selectedAccount && (
             <div className="flex flex-col gap-4">
-              <div className="border-border bg-muted/30 flex items-center gap-3 rounded-lg border px-4 py-3">
+              <div className="border-border bg-card-secondary flex items-center gap-3 rounded-lg border px-4 py-3">
                 <WalletIconAvatar wallet={selectedWallet} className="size-10" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-foreground font-geist-medium text-sm font-medium">
+                  <p className="font-pp-neue-montreal-bold text-foreground text-sm">
                     {isSigning ? "Signing…" : selectedWallet.name}
                   </p>
-                  <p className="text-muted-foreground font-mono text-xs">
+                  <p className="font-pp-neue-montreal-book text-muted-foreground text-xs">
                     {isSigning ? "…" : truncateId(selectedAccount.address, 6, 6)}
                   </p>
                 </div>
