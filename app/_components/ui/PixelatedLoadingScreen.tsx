@@ -9,26 +9,37 @@ export interface PixelatedLoadingScreenProps {
   scanline?: boolean;
 }
 
-export function PixelatedLoadingScreen({ className = "" }: PixelatedLoadingScreenProps) {
+export function PixelatedLoadingScreen({
+  message,
+  className = "",
+}: PixelatedLoadingScreenProps) {
   return (
     <div
       className={cn(
-        "relative flex h-full w-full items-center justify-center bg-background",
+        "relative flex h-full w-full flex-col items-center justify-center gap-8 bg-background",
         className,
       )}
       role="status"
       aria-live="polite"
-      aria-label="Loading"
+      aria-label={message ?? "Loading"}
     >
       <Image
         src="/images/img-claw.png"
-        alt="Loading"
+        alt=""
         width={120}
         height={120}
         className="animate-loading-claw object-contain"
         priority
         unoptimized
       />
+      <div className="bg-muted/50 h-1.5 w-full max-w-[200px] overflow-hidden rounded-full">
+        <div
+          className="bg-primary h-full w-1/3 rounded-full"
+          style={{
+            animation: "loading-progress-indeterminate 1.4s ease-in-out infinite",
+          }}
+        />
+      </div>
     </div>
   );
 }

@@ -80,7 +80,7 @@ export function ChatPanel({
         <div className="flex items-center gap-2">
           <span className="font-parabole mt-2 ml-2 text-lg">Chat</span>
         </div>
-        <BotIcon className="mt-2 size-5" />
+        <BotIcon className="mt-2 mr-2 size-5 lg:mr-0" />
       </div>
 
       {/* Messages */}

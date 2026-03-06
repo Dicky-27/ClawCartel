@@ -4,18 +4,18 @@ import * as React from "react";
 import { useMediaQuery } from "@/app/_hooks/useMediaQuery";
 import { cn } from "@/app/_libs/utils";
 import {
-  MessageSquareIcon,
   PanelLeftCloseIcon,
   PanelLeftIcon,
   PanelRightCloseIcon,
   PanelRightIcon,
-  LayoutDashboardIcon,
-  Code2Icon,
 } from "lucide-react";
+import { Sheet, SheetContent } from "@/app/_components/ui/sheet";
+import Image from "next/image";
 
 const MD_BREAKPOINT = "(min-width: 768px)";
 
-type MobileView = "chat" | "center" | "builder";
+/** Mobile: which bottom sheet is open (null = game only). */
+type MobileSheet = "chat" | "preview" | null;
 
 const DEFAULT_LEFT_WIDTH = 380;
 const MIN_LEFT_WIDTH = 0;
@@ -32,6 +32,7 @@ export interface IdeLayoutProps {
   defaultLeftSize?: number;
   defaultRightWidth?: number;
   defaultRightOpen?: boolean;
+  onMobileSheetOpenChange?: (open: boolean) => void;
   className?: string;
   leftClassName?: string;
   centerClassName?: string;
@@ -45,6 +46,7 @@ export function IdeLayout({
   defaultLeftSize = DEFAULT_LEFT_WIDTH,
   defaultRightWidth = DEFAULT_RIGHT_WIDTH,
   defaultRightOpen = true,
+  onMobileSheetOpenChange,
   className,
   leftClassName,
   centerClassName,
@@ -54,7 +56,15 @@ export function IdeLayout({
   const hasRight = right != null;
   const isDesktop = useMediaQuery(MD_BREAKPOINT);
 
-  const [mobileView, setMobileView] = React.useState<MobileView>("center");
+  const [mobileSheet, setMobileSheet] = React.useState<MobileSheet>(null);
+
+  const setMobileSheetWithCallback = React.useCallback(
+    (next: MobileSheet) => {
+      setMobileSheet(next);
+      onMobileSheetOpenChange?.(next !== null);
+    },
+    [onMobileSheetOpenChange],
+  );
   const [leftWidth, setLeftWidth] = React.useState(defaultLeftSize);
   const [rightWidth, setRightWidth] = React.useState(defaultRightOpen ? defaultRightWidth : 0);
   const leftDragRef = React.useRef(false);
@@ -115,98 +125,79 @@ export function IdeLayout({
 
   return (
     <>
-      {/* Mobile */}
+      {/* Mobile: game full-bleed; two absolute bottom buttons open 80% bottom sheets */}
       {!isDesktop && (
-        <div className={cn("flex h-full w-full flex-col", className)}>
-          <div className="relative min-h-0 flex-1 overflow-hidden">
-            {hasLeft && (
-              <div
-                className={cn(
-                  "absolute inset-0 h-full overflow-auto",
-                  leftClassName,
-                  mobileView !== "chat" && "hidden",
-                )}
-                aria-hidden={mobileView !== "chat"}
-              >
-                {left}
-              </div>
-            )}
-            <div
-              className={cn(
-                "absolute inset-0 h-full overflow-auto",
-                centerClassName,
-                // Use invisible+pointer-events-none instead of hidden (display:none).
-                // `hidden` shrinks the container to 0×0, which Phaser detects as a
-                // resize event and destroys the WebGL canvas → blank screen on return.
-                // `invisible` keeps full dimensions so Phaser stays alive, while
-                // `pointer-events-none` lets touches/clicks pass to the active panel.
-                mobileView !== "center" && "invisible max-lg:pointer-events-none",
-              )}
-              aria-hidden={mobileView !== "center"}
-            >
-              {children}
-            </div>
-            {hasRight && (
-              <div
-                className={cn(
-                  "absolute inset-0 h-full overflow-auto",
-                  rightClassName,
-                  mobileView !== "builder" && "hidden",
-                )}
-                aria-hidden={mobileView !== "builder"}
-              >
-                {right}
-              </div>
-            )}
+        <div className={cn("relative flex h-full w-full flex-col", className)}>
+          {/* Center (game) always visible */}
+          <div className={cn("absolute inset-0 min-h-0 overflow-hidden", centerClassName)}>
+            {children}
           </div>
-          <nav
-            className="flex shrink-0 items-center justify-around border-t pt-1 pb-[env(safe-area-inset-bottom,0)]"
-            aria-label="Main navigation"
+
+          {/* Absolute bottom buttons: Chat (left), Preview (right) */}
+          <div
+            className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-end justify-between px-4 pt-4 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
+            aria-label="Mobile actions"
           >
             {hasLeft && (
               <button
                 type="button"
-                onClick={() => setMobileView("chat")}
-                className={cn(
-                  "text-muted-foreground hover:text-foreground flex flex-1 flex-col items-center gap-0.5 py-2.5 transition-colors",
-                  mobileView === "chat" && "text-foreground",
-                )}
-                aria-current={mobileView === "chat" ? "page" : undefined}
-                aria-label="Chat"
+                onClick={() => setMobileSheetWithCallback("chat")}
+                className="border-border bg-card text-foreground hover:bg-muted pointer-events-auto flex size-20 flex-col items-center justify-center rounded-xl [box-shadow:4px_4px_0px_0px_#827B79_inset] transition-colors active:scale-[0.98]"
+                aria-label="Open Chat"
               >
-                <MessageSquareIcon className="size-5" />
-                <span className="font-geist-medium text-[10px] font-medium">Chat</span>
+                <Image
+                  src="/images/img-chat.png"
+                  alt="Chat"
+                  width={200}
+                  height={200}
+                  className="size-10 object-contain"
+                />
+                <span className="font-parabole text-sm">Chat</span>
               </button>
             )}
-            <button
-              type="button"
-              onClick={() => setMobileView("center")}
-              className={cn(
-                "text-muted-foreground hover:text-foreground flex flex-1 flex-col items-center gap-0.5 py-2.5 transition-colors",
-                mobileView === "center" && "text-foreground",
-              )}
-              aria-current={mobileView === "center" ? "page" : undefined}
-              aria-label="Home"
-            >
-              <LayoutDashboardIcon className="size-5" />
-              <span className="font-geist-medium text-[10px] font-medium">Home</span>
-            </button>
             {hasRight && (
               <button
                 type="button"
-                onClick={() => setMobileView("builder")}
-                className={cn(
-                  "text-muted-foreground hover:text-foreground flex flex-1 flex-col items-center gap-0.5 py-2.5 transition-colors",
-                  mobileView === "builder" && "text-foreground",
-                )}
-                aria-current={mobileView === "builder" ? "page" : undefined}
-                aria-label="Builder"
+                onClick={() => setMobileSheetWithCallback("preview")}
+                className="border-border bg-card text-foreground hover:bg-muted pointer-events-auto flex size-20 flex-col items-center justify-center rounded-xl [box-shadow:4px_4px_0px_0px_#827B79_inset] transition-colors active:scale-[0.98]"
+                aria-label="Open Preview"
               >
-                <Code2Icon className="size-5" />
-                <span className="font-geist-medium text-[10px] font-medium">Builder</span>
+                <Image
+                  src="/images/img-code.png"
+                  alt="Preview"
+                  width={200}
+                  height={200}
+                  className="size-10 object-contain"
+                />
+                <span className="font-parabole text-sm">Preview</span>
               </button>
             )}
-          </nav>
+          </div>
+
+          {/* Bottom sheet: Chat or Preview at 80% viewport height (dvh for mobile browser) */}
+          <Sheet
+            open={mobileSheet !== null}
+            onOpenChange={(open) => {
+              if (!open) setMobileSheetWithCallback(null);
+            }}
+          >
+            <SheetContent
+              side="bottom"
+              tall
+              showCloseButton={true}
+              className="border-border bg-card flex flex-col gap-0 p-0 [box-shadow:6px_6px_0px_0px_#827B79_inset] data-[side=bottom]:border-t"
+            >
+              <div
+                className={cn(
+                  "min-h-0 flex-1 overflow-auto",
+                  mobileSheet === "chat" ? leftClassName : rightClassName,
+                )}
+              >
+                {mobileSheet === "chat" && hasLeft && left}
+                {mobileSheet === "preview" && hasRight && right}
+              </div>
+            </SheetContent>
+          </Sheet>
         </div>
       )}
 

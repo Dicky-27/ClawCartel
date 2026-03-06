@@ -52,6 +52,7 @@
   --color-card-foreground: #000000;
   --color-card: #b8b0ae;
   --color-card-secondary: #aea6a4;
+  --color-card-accent: #282727;
 }
 
 :root {

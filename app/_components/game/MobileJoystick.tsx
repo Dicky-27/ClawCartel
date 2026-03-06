@@ -74,7 +74,13 @@ export function MobileJoystick({ onMove, enabled = true, className = "" }: Mobil
   return (
     <div
       className={`pointer-events-auto touch-none select-none ${className}`}
-      style={{ position: "absolute", left: 0, bottom: 10, width: 140, height: 140 }}
+      style={{
+        position: "absolute",
+        left: 0,
+        bottom: "calc(env(safe-area-inset-bottom, 0px) + 5.5rem)",
+        width: 140,
+        height: 140,
+      }}
       aria-hidden
     >
       <div

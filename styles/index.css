@@ -16,6 +16,16 @@
   }
 }
 
+/* Indeterminate progress bar (primary color) for loading screens */
+@keyframes loading-progress-indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+
 /* ─── Pixelated loading screen ─────────────────────────────────────────────── */
 @keyframes pixel-glow {
   0%,
@@ -155,6 +165,12 @@
 
 .typing-cursor {
   animation: typing-cursor-blink 0.7s step-end infinite;
+}
+
+/* Mobile bottom sheet: 90% of viewport; dvh for mobile browser chrome, vh fallback */
+.mobile-sheet-height {
+  height: 90vh;
+  height: 90dvh !important;
 }
 
 @layer base {
