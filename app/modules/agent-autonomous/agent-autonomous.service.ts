@@ -9,7 +9,9 @@ import {
 import {
   ROLE_AGENT_MAP,
   AUTONOMOUS_AGENT_BRIEFS,
+  AGENT_CATALOG,
 } from '#app/modules/agent-core/agent-core.config'
+import AgentRegistryService from '#app/modules/agent-core/agent-core.registry'
 import { OpenClawGatewayClient } from '#app/modules/agent-core/agent-core.gateway'
 import { fileSystem } from '#app/modules/agent-core/agent-core.files'
 import { AgentRun, EventType, Run } from '#app/modules/run/run.interface'
@@ -28,6 +30,88 @@ interface Discussion {
 
 const activeDiscussions = new Map<string, Discussion>()
 const siwsSessionRuns = new Map<number, string>()
+const AGENT_ROLES: AgentRole[] = ['pm', 'fe', 'be_sc', 'bd_research']
+
+interface RuntimeAgentIdentity {
+  id: number
+  name: string
+  role: AgentRole
+  emoji: string
+}
+
+const defaultAgentIdByRole = AGENT_CATALOG.reduce((acc, agent) => {
+  acc[agent.role] = agent.id
+
+  return acc
+}, {} as Partial<Record<AgentRole, number>>)
+
+const runAgentIdentityCache = new Map<string, Record<AgentRole, RuntimeAgentIdentity>>()
+
+function buildAutonomousFallbackIdentity(role: AgentRole): RuntimeAgentIdentity {
+  const brief = AUTONOMOUS_AGENT_BRIEFS[role]
+
+  return {
+    id: defaultAgentIdByRole[role] ?? 0,
+    name: brief.name,
+    role,
+    emoji: brief.emoji,
+  }
+}
+
+function resolveAutonomousIdentity(runId: string, role: AgentRole): RuntimeAgentIdentity {
+  const cached = runAgentIdentityCache.get(runId)?.[role]
+  if (cached) {
+    return cached
+  }
+
+  return buildAutonomousFallbackIdentity(role)
+}
+
+async function ensureAutonomousRunIdentities(runId: string): Promise<void> {
+  if (runAgentIdentityCache.has(runId)) {
+    return
+  }
+
+  const agentsByRole = await AgentRegistryService.getAgentsByRole('autonomous')
+  const identities: Record<AgentRole, RuntimeAgentIdentity> = {
+    pm: buildAutonomousFallbackIdentity('pm'),
+    fe: buildAutonomousFallbackIdentity('fe'),
+    'be_sc': buildAutonomousFallbackIdentity('be_sc'),
+    'bd_research': buildAutonomousFallbackIdentity('bd_research'),
+  }
+
+  for (const role of AGENT_ROLES) {
+    const entry = agentsByRole[role]
+    identities[role] = {
+      ...identities[role],
+      id: entry.id,
+      name: entry.agentName,
+      role: entry.role,
+    }
+  }
+
+  runAgentIdentityCache.set(runId, identities)
+}
+
+function clearAutonomousRunIdentities(runId: string): void {
+  runAgentIdentityCache.delete(runId)
+}
+
+function stripIdentityPayloadFields(payload: Record<string, unknown>): Record<string, unknown> {
+  const {
+    agent,
+    agentId,
+    agentName,
+    agentEmoji,
+    ...rest
+  } = payload
+  void agent
+  void agentId
+  void agentName
+  void agentEmoji
+
+  return rest
+}
 
 function broadcast(
   app: FastifyInstance,
@@ -36,18 +120,22 @@ function broadcast(
   eventType: EventType,
   payload: Record<string, unknown>
 ): void {
-  const brief = AUTONOMOUS_AGENT_BRIEFS[role]
+  const cleanPayload = stripIdentityPayloadFields(payload)
+  const identity = resolveAutonomousIdentity(runId, role)
+  const agent = {
+    id: identity.id,
+    name: identity.name,
+    role: identity.role,
+  }
 
   const streamEvent: StreamEvent = {
     runId,
     agentRunId: 'autonomous',
-    role,
+    agent,
     seq: Date.now(),
     eventType,
     payload: {
-      ...payload,
-      agentName: brief.name,
-      agentEmoji: brief.emoji,
+      ...cleanPayload,
       timestamp: new Date().toISOString(),
     },
   }
@@ -106,18 +194,22 @@ function broadcastCodeGen(
   eventType: EventType,
   payload: Record<string, unknown>
 ): void {
-  const brief = AUTONOMOUS_AGENT_BRIEFS[role]
+  const cleanPayload = stripIdentityPayloadFields(payload)
+  const identity = resolveAutonomousIdentity(runId, role)
+  const agent = {
+    id: identity.id,
+    name: identity.name,
+    role: identity.role,
+  }
 
   const streamEvent = {
     runId,
     agentRunId: 'autonomous',
-    role,
+    agent,
     seq: Date.now(),
     eventType,
     payload: {
-      ...payload,
-      agentName: brief.name,
-      agentEmoji: brief.emoji,
+      ...cleanPayload,
       timestamp: new Date().toISOString(),
     },
   }
@@ -133,30 +225,38 @@ function broadcastDM(
   toRole: AgentRole,
   content: string
 ): void {
-  const fromBrief = AUTONOMOUS_AGENT_BRIEFS[fromRole]
-  const toBrief = AUTONOMOUS_AGENT_BRIEFS[toRole]
+  const fromIdentity = resolveAutonomousIdentity(runId, fromRole)
+  const toIdentity = resolveAutonomousIdentity(runId, toRole)
+  const fromAgent = {
+    id: fromIdentity.id,
+    name: fromIdentity.name,
+    role: fromIdentity.role,
+  }
 
   const dmEvent = {
     runId,
     agentRunId: 'autonomous',
-    role: fromRole,
+    agent: fromAgent,
     seq: Date.now(),
     eventType: 'agent.dm' as EventType,
     isDM: true,
     dmTarget: toRole,
     payload: {
-      from: fromRole,
-      fromName: fromBrief.name,
-      fromEmoji: fromBrief.emoji,
-      to: toRole,
-      toName: toBrief.name,
+      from: fromIdentity.role,
+      fromAgentId: fromIdentity.id,
+      fromName: fromIdentity.name,
+      fromEmoji: fromIdentity.emoji,
+      to: toIdentity.role,
+      toAgentId: toIdentity.id,
+      toName: toIdentity.name,
+      toEmoji: toIdentity.emoji,
       content,
       timestamp: new Date().toISOString(),
     },
   }
 
   app.io.to(`run:${runId}`).emit('agent_event', dmEvent)
-  Logger.info({ runId, from: fromRole, to: toRole }, 'DM sent between agents')
+  Logger.info({ runId, from: fromIdentity.role, to: toIdentity.role }, 'DM sent between agents')
 }
 
 function getCodegenStateKey(runId: string, role: AgentRole): string {
@@ -178,6 +278,7 @@ async function finalizeCodeGenState(
   role: AgentRole,
   state: CodeGenState
 ): Promise<void> {
+  const identity = resolveAutonomousIdentity(runId, role)
   Logger.info({ runId, role, filePath: state.filePath, lines: state.lineCount }, '✅ Code generation complete')
 
   broadcastCodeGen(app, runId, role, 'codegen.done', {
@@ -191,7 +292,7 @@ async function finalizeCodeGenState(
     runId,
     state.filePath,
     state.buffer,
-    AUTONOMOUS_AGENT_BRIEFS[role].name
+    identity.name
   )
 
   // Keep non-code status updates on the regular agent channel.
@@ -375,6 +476,7 @@ async function streamAgentResponse(
   void agentRun
   const gateway = new OpenClawGatewayClient()
   const brief = AUTONOMOUS_AGENT_BRIEFS[role]
+  const identity = resolveAutonomousIdentity(runId, role)
   const canGenerateCode = role === 'fe' || role === 'be_sc'
   const isCodeGenTask = canGenerateCode && Boolean(fileWrites && fileWrites.length > 0)
   const isSilent = options?.silent === true
@@ -386,14 +488,14 @@ async function streamAgentResponse(
     fileInstructions = `\n\n=== FILE GENERATION TASK ===\nYou MUST write the following files:\n${fileWrites.map(f => `- ${f.path}: ${f.description}`).join('\n')}\n\nFor each file, use the CODE GENERATION FORMAT specified in your system prompt:\n===CODEGEN_START===\nfile: [filepath]\nlanguage: [lang]\n===\n[code content]\n===CODEGEN_END===\n\nProvide complete, production-ready code.`
   }
 
-  const fullPrompt = `${brief.systemPrompt}\n\n=== CONVERSATION CONTEXT ===\n${context}\n\n=== YOUR TURN ===\n${prompt}${fileInstructions}\n\nRespond as ${brief.name} in your natural voice.`
+  const fullPrompt = `${brief.systemPrompt}\n\n=== CONVERSATION CONTEXT ===\n${context}\n\n=== YOUR TURN ===\n${prompt}${fileInstructions}\n\nRespond as ${identity.name} in your natural voice.`
 
-  Logger.info({ runId, agent: brief.name }, 'Agent responding')
+  Logger.info({ runId, agent: identity.name }, 'Agent responding')
 
   if (!isSilent) {
     broadcast(app, runId, role, 'agent.started', {
-      message: `${brief.name} is typing...`,
-      agentName: brief.name,
+      message: `${identity.name} is typing...`,
+      agentName: identity.name,
       agentEmoji: brief.emoji,
     })
   }
@@ -426,7 +528,7 @@ async function streamAgentResponse(
             broadcast(app, runId, role, 'agent.delta', {
               message: chunk.content,
               accumulated: visibleText,
-              agentName: brief.name,
+              agentName: identity.name,
               agentEmoji: brief.emoji,
             })
           }
@@ -450,20 +552,20 @@ async function streamAgentResponse(
   }
 
   const doneMessage = isCodeGenTask
-    ? (visibleText.trim() || `${brief.name} finished code generation.`)
+    ? (visibleText.trim() || `${identity.name} finished code generation.`)
     : visibleText
 
   if (!isSilent) {
     broadcast(app, runId, role, 'agent.done', {
       message: doneMessage,
       isCodeGeneration: isCodeGenTask,
-      agentName: brief.name,
+      agentName: identity.name,
       agentEmoji: brief.emoji,
     })
   }
 
   if (isCodeGenTask && fullText.includes('===FILE:')) {
-    await extractAndWriteFiles(app, runId, fullText, brief.name)
+    await extractAndWriteFiles(app, runId, fullText, identity.name)
   }
 
   await delay(500)
@@ -522,6 +624,7 @@ async function processMultiRoundDiscussion(
     })
     await runService.updateRun(run.id, { status: 'completed' })
     activeDiscussions.delete(runId)
+    clearAutonomousRunIdentities(runId)
 
     return
   }
@@ -813,6 +916,8 @@ export async function continueToDevelopment(
   runId: string,
   approved: boolean
 ): Promise<void> {
+  await ensureAutonomousRunIdentities(runId)
+
   const discussion = activeDiscussions.get(runId)
   if (!discussion) {
     throw new Error('Discussion not found')
@@ -825,6 +930,7 @@ export async function continueToDevelopment(
     })
     await runService.updateRun(runId, { status: 'cancelled' })
     activeDiscussions.delete(runId)
+    clearAutonomousRunIdentities(runId)
 
     return
   }
@@ -902,6 +1008,7 @@ export async function continueToDevelopment(
 
   Logger.info({ runId, files: stats.totalFiles }, 'Code generation complete')
   activeDiscussions.delete(runId)
+  clearAutonomousRunIdentities(runId)
 }
 
 interface StartRunOptions {
@@ -984,6 +1091,8 @@ async function startRunInternal(
     })
   }
 
+  await ensureAutonomousRunIdentities(run.id)
+
   // Check Gateway
   try {
     const gateway = new OpenClawGatewayClient()
@@ -993,6 +1102,7 @@ async function startRunInternal(
     }
   } catch (error) {
     await runService.updateRun(run.id, { status: 'failed' })
+    clearAutonomousRunIdentities(run.id)
     const message = error instanceof Error ? error.message : 'Gateway check failed'
     throw new Error(`OpenClaw gateway unreachable: ${message}`)
   }
@@ -1002,6 +1112,7 @@ async function startRunInternal(
     .catch(async (error) => {
       Logger.error({ err: error, runId: run.id }, 'Multi-round discussion failed')
       await runService.updateRun(run.id, { status: 'failed' })
+      clearAutonomousRunIdentities(run.id)
     })
 
   const latestRun = await runService.getRun(run.id)
@@ -1015,6 +1126,7 @@ const AutonomousAgentService = {
   startNewThread: (app: FastifyInstance, body: StartRunBody, userId?: number): Promise<Run> =>
     startRunInternal(app, body, userId, { forceNewThread: true }),
 
+  listAgents: () => AgentRegistryService.listAgents('autonomous'),
   continueToDevelopment,
   getDiscussion: (runId: string) => activeDiscussions.get(runId),
   fileSystem,

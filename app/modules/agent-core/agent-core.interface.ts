@@ -11,6 +11,12 @@ export type AgentEventType =
   | 'agent.done'
   | 'agent.error'
   | 'run.done'
+  | 'agent.dm'
+  // Code generation events (for FE/BE_SC streaming)
+  | 'codegen.started'
+  | 'codegen.delta'
+  | 'codegen.done'
+  | 'codegen.error'
 
 export type AgentState =
   | 'idle'
@@ -37,14 +43,30 @@ export interface EventsQuery {
   fromSeq?: number
 }
 
+export interface AgentIdentity {
+  id: number
+  name: string
+  role: AgentRole
+}
+
 export interface StreamEvent {
   runId: string
   agentRunId: string
-  role: AgentRole
+  agent: AgentIdentity
   seq: number
   eventType: AgentEventType
   payload: Record<string, unknown>
   createdAt?: Date
+  isDM?: boolean
+  dmTarget?: string
+}
+
+// DM Message type for private agent conversations
+export interface DMMessage {
+  from: AgentRole
+  to: AgentRole
+  content: string
+  timestamp: number
 }
 
 // Gateway types
@@ -99,4 +121,52 @@ export interface AutonomousAgentBrief {
   emoji: string
   role: string
   systemPrompt: string
+}
+
+export interface AgentCatalogItem {
+  id: number
+  agentName: string
+  description: string
+  skills: string[]
+  role: AgentRole
+}
+
+// Code generation event payloads
+export interface CodeGenStartedPayload {
+  filePath: string
+  language: string
+  agentId?: number
+  agentName: string
+  agentEmoji: string
+  timestamp: string
+}
+
+export interface CodeGenDeltaPayload {
+  filePath: string
+  chunk: string
+  lineNumber?: number
+  agentId?: number
+  agentName: string
+  agentEmoji: string
+  timestamp: string
+}
+
+export interface CodeGenDonePayload {
+  filePath: string
+  language: string
+  totalLines: number
+  totalChars: number
+  agentId?: number
+  agentName: string
+  agentEmoji: string
+  timestamp: string
+}
+
+export interface CodeGenErrorPayload {
+  filePath: string
+  error: string
+  agentId?: number
+  agentName: string
+  agentEmoji: string
+  timestamp: string
 }

@@ -8,6 +8,12 @@ export default function (
   _: FastifyPluginOptions,
   done: DoneFuncWithErrOrRes
 ) {
+  app.get(
+    '/agents',
+    { schema: AutonomousSchema.listAgents },
+    AutonomousController.listAgents
+  )
+
   app.post<{ Body: StartRunBody }>(
     '/runs',
     { schema: AutonomousSchema.startRun },

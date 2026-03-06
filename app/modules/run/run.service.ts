@@ -345,7 +345,10 @@ class RunService {
       events: events.map((e: any) => ({
         seq: e.seq.toString(),
         eventType: e.eventType,
-        payload: e.payload as Record<string, unknown>,
+        payload: {
+          ...(e.payload as Record<string, unknown>),
+          agentId: e.agentRun.agentId,
+        },
         role: e.agentRun.role,
         agentRole: e.agentRun.role,
         agentId: e.agentRun.agentId,

@@ -36,6 +36,15 @@ async function getOptionalAuthenticatedUserId(
 
 const AutonomousController = {
   /**
+   * Returns available agents
+   */
+  listAgents: async (_request: FastifyRequest, reply: FastifyReply) => {
+    const agents = await AutonomousAgentService.listAgents()
+
+    return ResponseUtil.success(reply, { agents })
+  },
+
+  /**
    * Starts a new autonomous run.
    */
   startRun: async (

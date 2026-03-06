@@ -9,6 +9,7 @@ const runStatusEnum = [
 ]
 
 const inputTypeEnum = ['chat', 'prd']
+const roleEnum = ['pm', 'fe', 'be_sc', 'bd_research']
 
 const runParamsSchema = {
   type: 'object',
@@ -106,6 +107,23 @@ const fileNodeSchema = {
   },
 }
 
+const agentCatalogItemSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['id', 'agentName', 'description', 'skills', 'role'],
+  properties: {
+    id: { type: 'integer', description: 'Stable numeric agent identifier' },
+    agentName: { type: 'string', description: 'Agent display name' },
+    description: { type: 'string', description: 'Short agent responsibility summary' },
+    skills: {
+      type: 'array',
+      description: 'Agent capabilities',
+      items: { type: 'string' },
+    },
+    role: { type: 'string', enum: roleEnum },
+  },
+}
+
 const startRunBodySchema = {
   type: 'object',
   additionalProperties: false,
@@ -174,6 +192,34 @@ const sessionConflictErrorResponse = {
 }
 
 const AutonomousSchema = {
+  listAgents: {
+    tags: ['Autonomous'],
+    summary: 'List available agents',
+    description: 'Return the available agent roster for frontend identity mapping.',
+    response: {
+      200: {
+        ...successEnvelopeSchema,
+        description: 'Agent list',
+        properties: {
+          ...successEnvelopeSchema.properties,
+          status: { type: 'number', example: 200 },
+          success: { type: 'boolean', example: true },
+          data: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['agents'],
+            properties: {
+              agents: {
+                type: 'array',
+                items: agentCatalogItemSchema,
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+
   startRun: {
     tags: ['Autonomous'],
     summary: 'Start discussion',

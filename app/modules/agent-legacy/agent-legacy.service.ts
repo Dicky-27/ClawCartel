@@ -17,9 +17,97 @@ import {
   SQUAD_ROLES,
   LEGACY_AGENT_BRIEFS,
   DISCUSSION_TIMEOUT_MS,
+  LEGACY_AGENT_CATALOG,
 } from '#app/modules/agent-core/agent-core.config'
+import AgentRegistryService from '#app/modules/agent-core/agent-core.registry'
 import { OpenClawGatewayClient } from '#app/modules/agent-core/agent-core.gateway'
 import { AgentRun, EventType, Run } from '#app/modules/run/run.interface'
+
+interface RuntimeAgentIdentity {
+  id: number
+  name: string
+  role: AgentRole
+  emoji: string
+}
+
+const defaultAgentIdByRole = LEGACY_AGENT_CATALOG.reduce((acc, agent) => {
+  acc[agent.role] = agent.id
+
+  return acc
+}, {} as Partial<Record<AgentRole, number>>)
+
+const runAgentIdentityCache = new Map<string, Record<AgentRole, RuntimeAgentIdentity>>()
+
+function buildLegacyFallbackIdentity(role: AgentRole): RuntimeAgentIdentity {
+  const brief = LEGACY_AGENT_BRIEFS[role]
+
+  return {
+    id: defaultAgentIdByRole[role] ?? 0,
+    name: brief.name,
+    role,
+    emoji: brief.emoji,
+  }
+}
+
+function resolveLegacyIdentity(runId: string, role: AgentRole): RuntimeAgentIdentity {
+  const cached = runAgentIdentityCache.get(runId)?.[role]
+  if (cached) {
+    return cached
+  }
+
+  return buildLegacyFallbackIdentity(role)
+}
+
+async function ensureLegacyRunIdentities(runId: string): Promise<void> {
+  if (runAgentIdentityCache.has(runId)) {
+    return
+  }
+
+  const agentsByRole = await AgentRegistryService.getAgentsByRole('legacy')
+  const identities: Record<AgentRole, RuntimeAgentIdentity> = {
+    pm: buildLegacyFallbackIdentity('pm'),
+    fe: buildLegacyFallbackIdentity('fe'),
+    'be_sc': buildLegacyFallbackIdentity('be_sc'),
+    'bd_research': buildLegacyFallbackIdentity('bd_research'),
+  }
+
+  const roles: AgentRole[] = ['pm', 'fe', 'be_sc', 'bd_research']
+  for (const role of roles) {
+    const entry = agentsByRole[role]
+    identities[role] = {
+      ...identities[role],
+      id: entry.id,
+      name: entry.agentName,
+      role: entry.role,
+    }
+  }
+
+  runAgentIdentityCache.set(runId, identities)
+}
+
+function clearLegacyRunIdentities(runId: string): void {
+  runAgentIdentityCache.delete(runId)
+}
+
+function stripIdentityPayloadFields(payload: Record<string, unknown>): Record<string, unknown> {
+  const {
+    agent,
+    agentId,
+    agentName,
+    agentEmoji,
+    characterName,
+    characterEmoji,
+    ...rest
+  } = payload
+  void agent
+  void agentId
+  void agentName
+  void agentEmoji
+  void characterName
+  void characterEmoji
+
+  return rest
+}
 
 function detectState(text: string): AgentState {
   const lower = text.toLowerCase()
@@ -120,29 +208,33 @@ async function appendAndBroadcast(
   eventType: EventType,
   payload: Record<string, unknown>
 ): Promise<StreamEvent> {
+  const cleanPayload = stripIdentityPayloadFields(payload)
   const event = await runService.createAgentEvent({
     runId,
     agentRunId: agentRun.id,
     eventType,
-    payload,
+    payload: cleanPayload,
   })
 
   const brief = LEGACY_AGENT_BRIEFS[role]
+  const identity = resolveLegacyIdentity(runId, role)
+  const agent = {
+    id: identity.id,
+    name: identity.name,
+    role: identity.role,
+  }
 
   const streamEvent: StreamEvent = {
     runId,
     agentRunId: agentRun.id,
-    role,
+    agent,
     seq: Number(event.seq),
     eventType,
     payload: {
-      ...payload,
-      agentName: brief.name,
-      agentEmoji: brief.emoji,
+      ...cleanPayload,
       agentRole: brief.role,
       personality: brief.personality,
-      characterName: brief.name,
-      characterEmoji: brief.emoji,
+      timestamp: event.createdAt.toISOString(),
     },
     createdAt: event.createdAt,
   }
@@ -153,10 +245,10 @@ async function appendAndBroadcast(
     app.io.to(`run:${runId}`).emit('agent_state', {
       runId,
       agentRunId: agentRun.id,
-      role,
+      agent,
       state: payload.state,
-      agentName: brief.name,
-      agentEmoji: brief.emoji,
+      agentName: identity.name,
+      agentEmoji: identity.emoji,
     })
   }
 
@@ -172,6 +264,7 @@ async function streamAgentChat(
 ): Promise<string> {
   const gateway = new OpenClawGatewayClient()
   const brief = LEGACY_AGENT_BRIEFS[role]
+  const identity = resolveLegacyIdentity(run.id, role)
 
   await runService.updateAgentRun(agentRun.id, {
     status: 'running',
@@ -179,8 +272,8 @@ async function streamAgentChat(
   })
 
   await appendAndBroadcast(app, run.id, agentRun, role, 'agent.started', {
-    message: `${brief.name} is joining the discussion`,
-    agentName: brief.name,
+    message: `${identity.name} is joining the discussion`,
+    agentName: identity.name,
     agentEmoji: brief.emoji,
     personality: brief.personality,
   })
@@ -209,7 +302,7 @@ async function streamAgentChat(
           message: chunk.content,
           accumulated: fullText,
           state: currentState,
-          agentName: brief.name,
+          agentName: identity.name,
           agentEmoji: brief.emoji,
         })
       }
@@ -218,7 +311,7 @@ async function streamAgentChat(
     await appendAndBroadcast(app, run.id, agentRun, role, 'agent.done', {
       message: fullText,
       state: 'completed',
-      agentName: brief.name,
+      agentName: identity.name,
       agentEmoji: brief.emoji,
     })
 
@@ -227,17 +320,17 @@ async function streamAgentChat(
       endedAt: new Date(),
     })
 
-    Logger.info({ runId: run.id, role: brief.name, textLength: fullText.length }, 'Agent chat complete')
+    Logger.info({ runId: run.id, role: identity.name, textLength: fullText.length }, 'Agent chat complete')
 
     return fullText
 
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
-    Logger.error({ err: error, runId: run.id, role: brief.name }, 'Agent chat failed')
+    Logger.error({ err: error, runId: run.id, role: identity.name }, 'Agent chat failed')
 
     await appendAndBroadcast(app, run.id, agentRun, role, 'agent.error', {
       message,
-      agentName: brief.name,
+      agentName: identity.name,
       agentEmoji: brief.emoji,
     })
 
@@ -280,6 +373,7 @@ async function processRun(
       message: 'Analysis complete',
       pmBrief,
     })
+    clearLegacyRunIdentities(run.id)
 
     return
   }
@@ -308,8 +402,8 @@ async function processRun(
 
     try {
       const response = await streamAgentChat(app, run, agentRun, role, prompt)
-      const brief = LEGACY_AGENT_BRIEFS[role]
-      discussionLog.push(`${brief.name}: ${response}`)
+      const identity = resolveLegacyIdentity(run.id, role)
+      discussionLog.push(`${identity.name}: ${response}`)
     } catch (error) {
       Logger.error({ err: error, runId: run.id, role }, 'Agent discussion failed')
     }
@@ -331,6 +425,7 @@ async function processRun(
   })
 
   Logger.info({ runId: run.id }, 'Run complete')
+  clearLegacyRunIdentities(run.id)
 }
 
 const LegacyAgentService = {
@@ -348,6 +443,7 @@ const LegacyAgentService = {
       inputText,
       status: 'planning',
     })
+    await ensureLegacyRunIdentities(run.id)
 
     // Check Gateway
     try {
@@ -358,6 +454,7 @@ const LegacyAgentService = {
       }
     } catch (error) {
       await runService.updateRun(run.id, { status: 'failed' })
+      clearLegacyRunIdentities(run.id)
       const message = error instanceof Error ? error.message : 'Gateway check failed'
       throw new Error(`OpenClaw gateway unreachable: ${message}`)
     }
@@ -367,6 +464,7 @@ const LegacyAgentService = {
       .catch(async (error) => {
         Logger.error({ err: error, runId: run.id }, 'Run processing failed')
         await runService.updateRun(run.id, { status: 'failed' })
+        clearLegacyRunIdentities(run.id)
       })
 
     const latestRun = await runService.getRun(run.id)
@@ -385,6 +483,7 @@ const LegacyAgentService = {
     return gateway.healthCheck()
   },
 
+  listAgents: () => AgentRegistryService.listAgents('legacy'),
   getAgentBriefs: () => LEGACY_AGENT_BRIEFS,
 }
 

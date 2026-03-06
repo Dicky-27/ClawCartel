@@ -5,6 +5,9 @@ dotenv.config()
 
 export default defineConfig({
   schema: './prisma/schemas',
+  migrations: {
+    seed: 'node --import tsx ./prisma/seeders/index.ts',
+  },
   datasource: {
     url: env('DATABASE_URL'),
   }

@@ -12,7 +12,17 @@ export type AgentRole = 'pm' | 'fe' | 'be_sc' | 'bd_research'
 export type AgentRunStatus = 'queued' | 'running' | 'completed' | 'failed'
 
 // EventType enum
-export type EventType = 'agent.started' | 'agent.delta' | 'agent.done' | 'agent.error' | 'run.done'
+export type EventType =
+  | 'agent.started'
+  | 'agent.delta'
+  | 'agent.done'
+  | 'agent.error'
+  | 'run.done'
+  // Code generation events
+  | 'codegen.started'
+  | 'codegen.delta'
+  | 'codegen.done'
+  | 'codegen.error'
 
 // Run interface
 export interface Run {
