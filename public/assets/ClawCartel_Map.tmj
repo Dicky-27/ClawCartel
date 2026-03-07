@@ -1281,47 +1281,47 @@
  "tilesets":[
         {
          "firstgid":1,
-         "source":"Claw Cartel\/Box.tsx"
+         "source":"Claw-Cartel/Box.tsx"
         }, 
         {
          "firstgid":13,
-         "source":"Claw Cartel\/Test.tsx"
+         "source":"Claw-Cartel/Test.tsx"
         }, 
         {
          "firstgid":1363,
-         "source":"Claw Cartel\/Tile C.tsx"
+         "source":"Claw-Cartel/Tile-C.tsx"
         }, 
         {
          "firstgid":1395,
-         "source":"Claw Cartel\/Brick Wall A.tsx"
+         "source":"Claw-Cartel/Brick-Wall-A.tsx"
         }, 
         {
          "firstgid":1449,
-         "source":"Claw Cartel\/Adobe Brick Wall.tsx"
+         "source":"Claw-Cartel/Adobe-Brick-Wall.tsx"
         }, 
         {
          "firstgid":1473,
-         "source":"Claw Cartel\/Geometric Carpet C.tsx"
+         "source":"Claw-Cartel/Geometric-Carpet-C.tsx"
         }, 
         {
          "firstgid":1509,
-         "source":"Claw Cartel\/Arched Doorway A Shadows.tsx"
+         "source":"Claw-Cartel/Arched-Doorway-A-Shadows.tsx"
         }, 
         {
          "firstgid":1525,
-         "source":"Claw Cartel\/Arched Doorway A.tsx"
+         "source":"Claw-Cartel/Arched-Doorway-A.tsx"
         }, 
         {
          "firstgid":1570,
-         "source":"Diamond Tile C.tsx"
+         "source":"Diamond-Tile-C.tsx"
         }, 
         {
          "firstgid":1570,
-         "source":"Herringbone A.tsx"
+         "source":"Herringbone-A.tsx"
         }, 
         {
          "firstgid":1570,
-         "source":"Claw Cartel\/Barrel.tsx"
+         "source":"Claw-Cartel/Barrel.tsx"
         }, 
         {
          "firstgid":1570,
@@ -1329,152 +1329,152 @@
         }, 
         {
          "firstgid":1576,
-         "source":"Claw Cartel\/Stone Pillar A.tsx"
+         "source":"Claw-Cartel/Stone-Pillar-A.tsx"
         }, 
         {
          "firstgid":1684,
-         "source":"Siding, Plain.tsx"
+         "source":"Siding-Plain.tsx"
         }, 
         {
          "firstgid":1684,
-         "source":"Claw Cartel\/Textured Wood Border.tsx"
+         "source":"Claw-Cartel/Textured-Wood-Border.tsx"
         }, 
         {
          "firstgid":1853,
-         "source":"Claw Cartel\/Tile B.tsx"
+         "source":"Claw-Cartel/Tile-B.tsx"
         }, 
         {
          "firstgid":1869,
-         "source":"Claw Cartel\/Brick B edited.tsx"
+         "source":"Claw-Cartel/Brick-B-edited.tsx"
         }, 
         {
          "firstgid":1905,
-         "source":"Claw Cartel\/Posters.tsx"
+         "source":"Claw-Cartel/Posters.tsx"
         }, 
         {
          "firstgid":1920,
-         "source":"Claw Cartel\/terrain_summer.tsx"
+         "source":"Claw-Cartel/terrain_summer.tsx"
         }, 
         {
          "firstgid":2336,
-         "source":"Claw Cartel\/terrain_autumn.tsx"
+         "source":"Claw-Cartel/terrain_autumn.tsx"
         }, 
         {
          "firstgid":2752,
-         "source":"Claw Cartel\/trees_autumn.tsx"
+         "source":"Claw-Cartel/trees_autumn.tsx"
         }, 
         {
          "firstgid":3040,
-         "source":"Claw Cartel\/Swirling Vine Rug.tsx"
+         "source":"Claw-Cartel/Swirling-Vine-Rug.tsx"
         }, 
         {
          "firstgid":3060,
-         "source":"Claw Cartel\/Diamond Rug, tiling.tsx"
+         "source":"Claw-Cartel/Diamond-Rug-tiling.tsx"
         }, 
         {
          "firstgid":3132,
-         "source":"Claw Cartel\/Table, Ornate Wood.tsx"
+         "source":"Claw-Cartel/Table-Ornate-Wood.tsx"
         }, 
         {
          "firstgid":3156,
-         "source":"Claw Cartel\/Tile B 2.tsx"
+         "source":"Claw-Cartel/Tile-B-2.tsx"
         }, 
         {
          "firstgid":3169,
-         "source":"Claw Cartel\/terrain_autumn 1.tsx"
+         "source":"Claw-Cartel/terrain_autumn-1.tsx"
         }, 
         {
          "firstgid":3457,
-         "source":"Claw Cartel\/Lighting, Floor.tsx"
+         "source":"Claw-Cartel/Lighting-Floor.tsx"
         }, 
         {
          "firstgid":3493,
-         "source":"Claw Cartel\/Lighting, Table.tsx"
+         "source":"Claw-Cartel/Lighting-Table.tsx"
         }, 
         {
          "firstgid":3517,
-         "source":"Claw Cartel\/Kitchen Clutter A.tsx"
+         "source":"Claw-Cartel/Kitchen-Clutter-A.tsx"
         }, 
         {
          "firstgid":3547,
-         "source":"Claw Cartel\/Dust.tsx"
+         "source":"Claw-Cartel/Dust.tsx"
         }, 
         {
          "firstgid":3555,
-         "source":"Claw Cartel\/Lumber.tsx"
+         "source":"Claw-Cartel/Lumber.tsx"
         }, 
         {
          "firstgid":3585,
-         "source":"Claw Cartel\/Plain Fence A.tsx"
+         "source":"Claw-Cartel/Plain-Fence-A.tsx"
         }, 
         {
          "firstgid":3605,
-         "source":"Claw Cartel\/Plain Smooth Border 1.tsx"
+         "source":"Claw-Cartel/Plain-Smooth-Border-1.tsx"
         }, 
         {
          "firstgid":3657,
-         "source":"Claw Cartel\/Skeletons.tsx"
+         "source":"Claw-Cartel/Skeletons.tsx"
         }, 
         {
          "firstgid":3663,
-         "source":"Claw Cartel\/Prison A.tsx"
+         "source":"Claw-Cartel/Prison-A.tsx"
         }, 
         {
          "firstgid":3687,
-         "source":"Short Steps A.tsx"
+         "source":"Short-Steps-A.tsx"
         }, 
         {
          "firstgid":3687,
-         "source":"Cement Stairs A.tsx"
+         "source":"Cement-Stairs-A.tsx"
         }, 
         {
          "firstgid":3702,
-         "source":"Claw Cartel\/Diamond Tile C.tsx"
+         "source":"Claw-Cartel/Diamond-Tile-C.tsx"
         }, 
         {
          "firstgid":3706,
-         "source":"Claw Cartel\/Fire, Camp.tsx"
+         "source":"Claw-Cartel/Fire-Camp.tsx"
         }, 
         {
          "firstgid":3714,
-         "source":"Claw Cartel\/Fire, Fireplace.tsx"
+         "source":"Claw-Cartel/Fire-Fireplace.tsx"
         },
     
         {
          "firstgid":3738,
-         "source":"Claw Cartel\/Cauldron.tsx"
+         "source":"Claw-Cartel/Cauldron.tsx"
         }, 
         {
          "firstgid":3743,
-         "source":"Claw Cartel\/Ladder.tsx"
+         "source":"Claw-Cartel/Ladder.tsx"
         }, 
         {
          "firstgid":3752,
-         "source":"Claw Cartel\/Cabinet.tsx"
+         "source":"Claw-Cartel/Cabinet.tsx"
         }, 
         {
          "firstgid":3815,
-         "source":"Claw Cartel\/Fireplace.tsx"
+         "source":"Claw-Cartel/Fireplace.tsx"
         }, 
         {
          "firstgid":3851,
-         "source":"Claw Cartel\/Chair, Sofa B.tsx"
+         "source":"Claw-Cartel/Chair-Sofa-B.tsx"
         }, 
         {
          "firstgid":3899,
-         "source":"Claw Cartel\/Workbench, Smith.tsx"
+         "source":"Claw-Cartel/Workbench-Smith.tsx"
         }, 
         {
          "firstgid":3923,
-         "source":"Claw Cartel\/Table, Workshop.tsx"
+         "source":"Claw-Cartel/Table-Workshop.tsx"
         }, 
         {
          "firstgid":3939,
-         "source":"Claw Cartel\/plants_autumn.tsx"
+         "source":"Claw-Cartel/plants_autumn.tsx"
         }, 
         {
          "firstgid":4019,
-         "source":"Claw Cartel\/mushrooms.tsx"
+         "source":"Claw-Cartel/mushrooms.tsx"
         }],
  "tilewidth":32,
  "type":"map",

@@ -2,8 +2,8 @@ import * as Phaser from "phaser";
 
 const MAP_URL = "/assets/ClawCartel_Map.tmj";
 const ASSETS_BASE = "/assets/";
-/** TSX files live in this folder; map sometimes has source without it (e.g. "Diamond Tile C.tsx"). */
-const TSX_FOLDER = "Claw Cartel/";
+/** TSX files live in this folder; map sometimes has source without it (e.g. "Diamond-Tile-C.tsx"). URL-safe names (no spaces/commas). */
+const TSX_FOLDER = "Claw-Cartel/";
 
 function resolveTsxPath(source: string): string {
   if (source.startsWith(TSX_FOLDER)) return source;
