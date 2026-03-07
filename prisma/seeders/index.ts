@@ -1,8 +1,12 @@
 import db from '#prisma/prisma'
-import { AGENT_CATALOG } from '#app/modules/agent-core/agent-core.config'
+import agentLoader from '#app/agents/agent-loader'
 
 async function seedAgents(): Promise<void> {
-  for (const agent of AGENT_CATALOG) {
+  // Load agent definitions from agents/ folder
+  await agentLoader.loadAll()
+  const catalog = agentLoader.getCatalog()
+
+  for (const agent of catalog) {
     await db.agent.upsert({
       where: { id: agent.id },
       update: {
@@ -25,7 +29,8 @@ async function seedAgents(): Promise<void> {
 async function seed(): Promise<void> {
   console.log('Start seeding...')
   await seedAgents()
-  console.log(`Seeded ${AGENT_CATALOG.length} agents.`)
+  const catalog = agentLoader.getCatalog()
+  console.log(`Seeded ${catalog.length} agents.`)
   console.log('Seeding finished.')
 }
 

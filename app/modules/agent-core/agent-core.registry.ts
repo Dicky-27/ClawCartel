@@ -1,13 +1,14 @@
 import db from '#prisma/prisma'
 import Logger from '#app/utils/logger'
-import { AGENT_CATALOG, LEGACY_AGENT_CATALOG } from '#app/modules/agent-core/agent-core.config'
+import agentLoader from '#app/agents/agent-loader'
 import { AgentCatalogItem, AgentRole } from '#app/modules/agent-core/agent-core.interface'
 
 type AgentCatalogMode = 'autonomous' | 'legacy'
 type AgentCatalogByRole = Record<AgentRole, AgentCatalogItem>
 
-function getFallbackCatalog(mode: AgentCatalogMode): AgentCatalogItem[] {
-  return mode === 'legacy' ? LEGACY_AGENT_CATALOG : AGENT_CATALOG
+function getFallbackCatalog(_mode: AgentCatalogMode): AgentCatalogItem[] {
+  // Both modes now use the same catalog from agents/ folder
+  return agentLoader.getCatalog()
 }
 
 function mapDbAgents(

@@ -95,8 +95,7 @@ const AutonomousController = {
   ) => {
     const { runId } = request.params
     const { approved } = request.body
-
-    await AutonomousAgentService.continueToDevelopment(request.server, runId, approved)
+    await AutonomousAgentService.continueToDevelopment(request.server, runId, approved ? 'approved' : 'rejected')
 
     return ResponseUtil.success(reply, {
       runId,

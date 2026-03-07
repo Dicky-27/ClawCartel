@@ -8,6 +8,7 @@ import AppConfig from '#app/config/app'
 import FastifyUtil from '#app/utils/fastify'
 import Logger from '#app/utils/logger'
 import { registerSocket } from '#app/utils/socket'
+import agentLoader from '#app/agents/agent-loader'
 
 const fastify = Fastify({
   logger: {
@@ -84,6 +85,13 @@ const fastify = Fastify({
         persistAuthorization: true,
       },
     })
+
+    // Load agent identity files from agents/ directory
+    await agentLoader.loadAll()
+
+    // Register tool handlers for the skill system
+    const { initializeSkills } = await import('#app/agents/skills/index')
+    initializeSkills()
 
     await fastify.register(routes)
 

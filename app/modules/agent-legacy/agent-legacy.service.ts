@@ -12,13 +12,8 @@ import {
   StreamEvent,
   AgentState,
 } from '#app/modules/agent-core/agent-core.interface'
-import {
-  ROLE_AGENT_MAP,
-  SQUAD_ROLES,
-  LEGACY_AGENT_BRIEFS,
-  DISCUSSION_TIMEOUT_MS,
-  LEGACY_AGENT_CATALOG,
-} from '#app/modules/agent-core/agent-core.config'
+import agentLoader, { ROLE_AGENT_MAP, SQUAD_ROLES, DISCUSSION_TIMEOUT_MS } from '#app/agents/agent-loader'
+import { PromptBuilder } from '#app/agents/prompt-builder'
 import AgentRegistryService from '#app/modules/agent-core/agent-core.registry'
 import { OpenClawGatewayClient } from '#app/modules/agent-core/agent-core.gateway'
 import { AgentRun, EventType, Run } from '#app/modules/run/run.interface'
@@ -30,22 +25,18 @@ interface RuntimeAgentIdentity {
   emoji: string
 }
 
-const defaultAgentIdByRole = LEGACY_AGENT_CATALOG.reduce((acc, agent) => {
-  acc[agent.role] = agent.id
-
-  return acc
-}, {} as Partial<Record<AgentRole, number>>)
+const promptBuilder = new PromptBuilder(agentLoader)
 
 const runAgentIdentityCache = new Map<string, Record<AgentRole, RuntimeAgentIdentity>>()
 
 function buildLegacyFallbackIdentity(role: AgentRole): RuntimeAgentIdentity {
-  const brief = LEGACY_AGENT_BRIEFS[role]
+  const agent = agentLoader.getByRole(role)
 
   return {
-    id: defaultAgentIdByRole[role] ?? 0,
-    name: brief.name,
+    id: 0,
+    name: agent.name,
     role,
-    emoji: brief.emoji,
+    emoji: agent.emoji,
   }
 }
 
@@ -122,13 +113,13 @@ function detectState(text: string): AgentState {
 }
 
 function buildPMPrompt(inputText: string): string {
-  const pm = LEGACY_AGENT_BRIEFS.pm
+  const brief = promptBuilder.buildLegacyBrief('pm')
 
-  return `You are ${pm.name} ${pm.emoji}, the ${pm.role} of ClawCartel.
+  return `You are ${brief.name}, the ${brief.role} of ClawCartel.
 
-PERSONALITY: ${pm.personality}
-SPEAKING STYLE: ${pm.speakingStyle}
-QUIRK: ${pm.quirk}
+PERSONALITY: ${brief.personality}
+SPEAKING STYLE: ${brief.speakingStyle}
+QUIRK: ${brief.quirk}
 
 USER REQUEST: "${inputText}"
 
@@ -148,9 +139,9 @@ function buildSquadPrompt(
   userInput: string,
   discussionLog: string
 ): string {
-  const brief = LEGACY_AGENT_BRIEFS[role]
+  const brief = promptBuilder.buildLegacyBrief(role)
 
-  return `You are ${brief.name} ${brief.emoji}, ${brief.role} at ClawCartel.
+  return `You are ${brief.name}, ${brief.role} at ClawCartel.
 
 PERSONALITY: ${brief.personality}
 SPEAKING STYLE: ${brief.speakingStyle}
@@ -176,13 +167,13 @@ Write naturally in complete sentences and paragraphs. Don't use bullet points un
 }
 
 function buildPMSummaryPrompt(pmBrief: string, discussionLog: string): string {
-  const pm = LEGACY_AGENT_BRIEFS.pm
+  const briefPM = promptBuilder.buildLegacyBrief('pm')
 
-  return `You are ${pm.name} ${pm.emoji}, the ${pm.role}.
+  return `You are ${briefPM.name}, the ${briefPM.role}.
 
-PERSONALITY: ${pm.personality}
-SPEAKING STYLE: ${pm.speakingStyle}
-QUIRK: ${pm.quirk}
+PERSONALITY: ${briefPM.personality}
+SPEAKING STYLE: ${briefPM.speakingStyle}
+QUIRK: ${briefPM.quirk}
 
 YOUR ORIGINAL BRIEF:
 ${pmBrief}
@@ -216,7 +207,7 @@ async function appendAndBroadcast(
     payload: cleanPayload,
   })
 
-  const brief = LEGACY_AGENT_BRIEFS[role]
+  const brief = promptBuilder.buildLegacyBrief(role)
   const identity = resolveLegacyIdentity(runId, role)
   const agent = {
     id: identity.id,
@@ -263,7 +254,7 @@ async function streamAgentChat(
   prompt: string
 ): Promise<string> {
   const gateway = new OpenClawGatewayClient()
-  const brief = LEGACY_AGENT_BRIEFS[role]
+  const brief = promptBuilder.buildLegacyBrief(role)
   const identity = resolveLegacyIdentity(run.id, role)
 
   await runService.updateAgentRun(agentRun.id, {
@@ -484,7 +475,11 @@ const LegacyAgentService = {
   },
 
   listAgents: () => AgentRegistryService.listAgents('legacy'),
-  getAgentBriefs: () => LEGACY_AGENT_BRIEFS,
+  getAgentBriefs: () => {
+    const roles: AgentRole[] = ['pm', 'fe', 'be_sc', 'bd_research']
+
+    return Object.fromEntries(roles.map(r => [r, promptBuilder.buildLegacyBrief(r)]))
+  },
 }
 
 export default LegacyAgentService

@@ -90,7 +90,7 @@ const LegacyAgentController = {
     const { runId } = request.params
     const { approved } = request.body
 
-    await continueToDevelopment(request.server, runId, approved)
+    await continueToDevelopment(request.server, runId, approved ? 'approved' : 'rejected')
 
     return ResponseUtil.success(reply, {
       runId,
