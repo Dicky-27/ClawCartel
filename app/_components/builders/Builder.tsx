@@ -1,0 +1,396 @@
+"use client";
+
+import {
+  ensureParentDirs,
+  getPreviewUrl,
+  getStatus,
+  getTerminalOutput,
+  init,
+  readFile,
+  rebuild,
+  reinstallAndRestart,
+  setStatusListener,
+  setTerminalListener,
+  writeFile,
+} from "@/app/_libs/webcontainer/core";
+import type { WebContainerStatus } from "@/app/_libs/webcontainer/core";
+import { defaultPageContent } from "@/app/_libs/webcontainer/defaultProject";
+import { useChat } from "@/app/_providers/ChatProvider";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { DownloadIcon, ExternalLinkIcon, RotateCwIcon } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
+import { Button } from "../ui/button";
+import CodeTab from "./CodeTab";
+import PreviewTab from "./PreviewTab";
+
+const DEFAULT_OPEN_FILES = ["src/App.tsx", "src/App.jsx", "src/main.tsx", "src/main.jsx"];
+const WRITE_DEBOUNCE_MS = 500;
+const CONFIG_FILES = ["package.json", "vite.config.js", "vite.config.ts", "index.html"];
+
+/**
+ * Map backend path to WebContainer project path.
+ * - If path contains "frontend/", use the part after it (e.g. frontend/src/App.jsx → src/App.jsx).
+ * - Otherwise treat as project-relative (e.g. src/App.jsx → src/App.jsx) so backend can send either form.
+ */
+function normalizeCodegenPath(backendPath: string): string | null {
+  const trimmed = backendPath.replace(/^\/+/, "").replace(/\/+$/, "");
+  const frontendIndex = trimmed.indexOf("frontend/");
+  if (frontendIndex !== -1) {
+    const relative = trimmed.slice(frontendIndex + "frontend/".length);
+    return relative || null;
+  }
+  return trimmed || null;
+}
+
+export default function Builder() {
+  const {
+    codegenPendingWrites,
+    hasCodegenPending,
+    ackCodegenWrite,
+    ackCodegenWrites,
+    downloadProject,
+    deployedTxHashes,
+    step,
+  } = useChat();
+  const [status, setStatus] = useState<WebContainerStatus>(getStatus());
+  const [previewUrl, setPreviewUrl] = useState<string | null>(getPreviewUrl());
+  const [code, setCode] = useState(defaultPageContent);
+  const [currentFilePath, setCurrentFilePath] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [terminalOutput, setTerminalOutput] = useState(() => getTerminalOutput());
+  const writeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasAutoSelectedRef = useRef(false);
+  const [treeRefreshTrigger, setTreeRefreshTrigger] = useState(0);
+  const [previewReloadKey, setPreviewReloadKey] = useState(0);
+  const switchedToCodegenRef = useRef(false);
+  const clearedDefaultsRef = useRef(false);
+  const [isRebuilding, setIsRebuilding] = useState(false);
+  const needsReinstallRef = useRef(false);
+  const pendingBuildRef = useRef(false);
+
+  const setPageCode = useCallback(
+    (content: string) => {
+      setCode(content);
+      if (writeTimeoutRef.current) clearTimeout(writeTimeoutRef.current);
+      writeTimeoutRef.current = setTimeout(async () => {
+        writeTimeoutRef.current = null;
+        if (!currentFilePath) return;
+        try {
+          await writeFile(currentFilePath, content);
+          setError(null);
+        } catch (err) {
+          console.error("[Builder] writeFile failed:", err);
+          setError(err instanceof Error ? err.message : "Failed to update preview");
+        }
+      }, WRITE_DEBOUNCE_MS);
+    },
+    [currentFilePath],
+  );
+
+  const handleSelectFile = useCallback(async (path: string) => {
+    setError(null);
+    try {
+      const content = await readFile(path);
+      setCurrentFilePath(path);
+      setCode(content);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load file");
+    }
+  }, []);
+
+  const handleTreeLoad = useCallback(async () => {
+    if (hasAutoSelectedRef.current) return;
+    hasAutoSelectedRef.current = true;
+    for (const file of DEFAULT_OPEN_FILES) {
+      try {
+        await handleSelectFile(file);
+        return; // Success, stop trying others
+      } catch {
+        // Continue trying next default
+      }
+    }
+    // If all fail, optionally fallback to the first default just to show the error
+    handleSelectFile(DEFAULT_OPEN_FILES[0]);
+  }, [handleSelectFile]);
+
+  useEffect(() => {
+    setStatusListener((s) => {
+      setStatus(s);
+      if (s === "ready") setPreviewUrl(getPreviewUrl());
+    });
+    setTerminalListener((out) => setTerminalOutput(out));
+    return () => {
+      setStatusListener(null);
+      setTerminalListener(null);
+      if (writeTimeoutRef.current) clearTimeout(writeTimeoutRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function run() {
+      if (getStatus() === "ready" || getStatus() === "starting") {
+        setPreviewUrl(getPreviewUrl());
+        return;
+      }
+      setError(null);
+      try {
+        await init((url) => {
+          if (!cancelled) setPreviewUrl(url);
+        });
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Failed to start");
+        }
+      }
+    }
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // When codegen arrives and WebContainer isn't ready yet, start it so we can sync once ready
+  useEffect(() => {
+    const hasPending = Object.keys(codegenPendingWrites).length > 0;
+    const current = getStatus();
+    if (
+      hasPending &&
+      current !== "ready" &&
+      current !== "error" &&
+      current !== "booting" &&
+      current !== "installing" &&
+      current !== "starting"
+    ) {
+      init((url) => setPreviewUrl(url));
+    }
+  }, [codegenPendingWrites]);
+
+  // Apply codegen updates: write every file (index.html, package.json, src/App.jsx, etc.) then batch-ack so preview gets full project
+  useEffect(() => {
+    const pending = codegenPendingWrites;
+    const paths = Object.keys(pending);
+    if (paths.length === 0 || status !== "ready") return;
+
+    if (!clearedDefaultsRef.current) {
+        clearedDefaultsRef.current = true;
+        // The core module's writeFile creates dirs if missing, but we want to wipe the initial default src directory
+        // before we lay down the new files, so we don't end up with both App.jsx and App.tsx.
+        import("@/app/_libs/webcontainer/core").then(({ removeFile }) => {
+           removeFile("src").catch(() => {});
+        });
+    }
+
+    switchedToCodegenRef.current = false;
+    const writePromises: Promise<string | null>[] = [];
+
+    for (const path of paths) {
+      const content = pending[path];
+      if (content === undefined) continue;
+
+      const localPath = normalizeCodegenPath(path);
+      if (!localPath) {
+        ackCodegenWrite(path);
+        continue;
+      }
+
+      const basename = localPath.split("/").pop() ?? "";
+      if (CONFIG_FILES.includes(basename)) {
+        needsReinstallRef.current = true;
+      }
+
+      const p = (async (): Promise<string | null> => {
+        try {
+          await ensureParentDirs(localPath);
+          await writeFile(localPath, content);
+
+          const isCurrentFile = localPath === currentFilePath;
+          const shouldSwitchToCodegen =
+            !switchedToCodegenRef.current &&
+            (currentFilePath === null || DEFAULT_OPEN_FILES.includes(currentFilePath));
+
+          if (isCurrentFile) {
+            if (writeTimeoutRef.current) {
+              clearTimeout(writeTimeoutRef.current);
+              writeTimeoutRef.current = null;
+            }
+            setCode(content);
+          } else if (shouldSwitchToCodegen) {
+            switchedToCodegenRef.current = true;
+            setCurrentFilePath(localPath);
+            setCode(content);
+          }
+
+          setTreeRefreshTrigger((t) => t + 1);
+          return path;
+        } catch (err) {
+          console.error("[Builder] codegen writeFile failed:", err);
+          setError(err instanceof Error ? err.message : "Failed to apply codegen");
+          return null;
+        }
+      })();
+      writePromises.push(p);
+    }
+
+    // Ack only after all writes finish so we don't re-run effect mid-batch and miss files (e.g. index.html)
+    Promise.all(writePromises).then((results) => {
+      const writtenBackendPaths = results.filter((p): p is string => p != null);
+      if (writtenBackendPaths.length > 0) {
+        ackCodegenWrites(writtenBackendPaths);
+        pendingBuildRef.current = true;
+      }
+    });
+  }, [codegenPendingWrites, status, currentFilePath, ackCodegenWrite, ackCodegenWrites]);
+
+  // Trigger rebuild only when code generation finishes
+  useEffect(() => {
+    if (step === "complete" && pendingBuildRef.current && status === "ready") {
+      pendingBuildRef.current = false;
+      const reloadPreview = () => setPreviewReloadKey((k) => k + 1);
+      if (needsReinstallRef.current) {
+        needsReinstallRef.current = false;
+        reinstallAndRestart()
+          .then(reloadPreview)
+          .catch((err) => {
+            console.error("[Builder] reinstallAndRestart failed:", err);
+            setError(err instanceof Error ? err.message : "Failed to reinstall dependencies");
+          });
+      } else {
+        rebuild()
+          .then(reloadPreview)
+          .catch((err) => {
+            console.error("[Builder] rebuild after codegen failed:", err);
+          });
+      }
+    } else if (step === "idle") {
+       clearedDefaultsRef.current = false;
+    }
+  }, [step, status]);
+
+  const handleRebuild = useCallback(async () => {
+    setIsRebuilding(true);
+    setError(null);
+    try {
+      if (needsReinstallRef.current) {
+        needsReinstallRef.current = false;
+        await reinstallAndRestart();
+      } else {
+        await rebuild();
+      }
+      setStatus(getStatus());
+      setPreviewReloadKey((k) => k + 1);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Rebuild failed");
+    } finally {
+      setIsRebuilding(false);
+      setStatus(getStatus());
+    }
+  }, []);
+
+  if (typeof window !== "undefined" && !window.crossOriginIsolated) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center p-4 text-center">
+        <div className="border-border bg-muted/50 rounded-lg border p-6">
+          <h2 className="text-foreground font-geist-semi-bold text-lg font-semibold">
+            WebContainer not supported
+          </h2>
+          <p className="text-muted-foreground mt-2 text-sm">
+            This needs cross-origin isolation. Use a supported browser (Chrome, Edge, Firefox, or
+            Safari 16.4+).
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-full flex-col">
+      <Tabs defaultValue="preview" className="flex h-full flex-1 flex-col gap-0 px-0">
+        <div className="flex items-center justify-between pr-2">
+          <h1 className="font-parabole mt-4 ml-4 text-lg lg:mt-2 lg:ml-2">Files</h1>
+          <div className="mt-4 mr-10 flex items-center gap-1.5 lg:mt-3">
+            {deployedTxHashes.length > 0 && (
+              <a
+                href={`https://solscan.io/tx/${deployedTxHashes[deployedTxHashes.length - 1].txHash}?cluster=devnet`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="font-parabole gap-1.5 border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-400"
+                >
+                  <ExternalLinkIcon className="size-3.5" />
+                  Solscan
+                </Button>
+              </a>
+            )}
+            {step === "complete" && !hasCodegenPending && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="font-parabole gap-1.5"
+                onClick={downloadProject}
+              >
+                <DownloadIcon className="size-3.5" />
+                Download
+              </Button>
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="font-parabole gap-1.5"
+              onClick={handleRebuild}
+              disabled={isRebuilding || (status !== "ready" && status !== "starting")}
+            >
+              <RotateCwIcon className={`size-3.5 ${isRebuilding ? "animate-spin" : ""}`} />
+            </Button>
+          </div>
+        </div>
+        <div className="shrink-0 p-2">
+          <TabsList className="bg-primary/10 p-1">
+            <TabsTrigger
+              value="preview"
+              className="data-active:bg-primary data-active:text-primary-foreground data-active:border-primary/30"
+            >
+              Preview
+            </TabsTrigger>
+            <TabsTrigger
+              value="code"
+              className="data-active:bg-primary data-active:text-primary-foreground data-active:border-primary/30"
+            >
+              Code
+            </TabsTrigger>
+          </TabsList>
+        </div>
+
+        <TabsContent value="preview" className="min-h-0 flex-1 overflow-auto">
+          <PreviewTab
+            status={status}
+            previewUrl={previewUrl}
+            error={error}
+            hasCodegenPending={hasCodegenPending}
+            previewReloadKey={previewReloadKey}
+          />
+        </TabsContent>
+
+        <TabsContent value="code" className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <CodeTab
+            status={status}
+            terminalOutput={terminalOutput}
+            code={code}
+            currentFilePath={currentFilePath}
+            error={error}
+            onSelectFile={handleSelectFile}
+            onCodeChange={setPageCode}
+            onTreeLoad={handleTreeLoad}
+            treeRefreshTrigger={treeRefreshTrigger}
+          />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}

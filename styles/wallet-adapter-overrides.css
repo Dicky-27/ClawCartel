@@ -1,0 +1,118 @@
+/* Override @solana/wallet-adapter-react-ui modal to match app style (Dialog + card panels) */
+
+.wallet-adapter-modal {
+  background: rgb(0 0 0 / 0.1);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+
+.wallet-adapter-modal-overlay {
+  background: rgb(0 0 0 / 0.1);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+
+/* Card style: same as app panels (WelcomeDialog, IdeLayout, WalletConnectDialog) */
+.wallet-adapter-modal-wrapper {
+  max-width: 400px;
+  border-radius: 1rem;
+  background: var(--color-card, #b8b0ae);
+  color: var(--color-card-foreground, #000000);
+  border: 1px solid var(--color-border-card, #615b59);
+  box-shadow: 6px 6px 0 0 #827b79 inset;
+  font-family: var(--font-pp-neue-montreal-book, "PpNeueMontreal-Book", sans-serif);
+}
+
+.wallet-adapter-modal-title {
+  font-family: var(--font-parabole, "Parabole", sans-serif);
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+  padding: 1.5rem 1.5rem 1rem;
+  padding-right: calc(1.5rem + 16px);
+  text-align: center;
+  color: var(--color-text-primary, var(--foreground));
+  font-weight: 400;
+}
+
+.wallet-adapter-modal-button-close {
+  top: 1rem;
+  right: 1rem;
+  padding: 0.5rem;
+  background: transparent;
+  border-radius: 0.5rem;
+}
+
+.wallet-adapter-modal-button-close:hover {
+  background: var(--muted);
+}
+
+.wallet-adapter-modal-button-close:hover svg {
+  fill: var(--foreground);
+}
+
+/* Inset content so list doesn’t touch the 6px inner shadow */
+.wallet-adapter-modal-middle {
+  padding: 0 1.5rem 1.5rem;
+  padding-right: calc(1.5rem + 16px);
+  padding-bottom: calc(1.5rem + 16px);
+}
+
+/* Keep list (and wallet buttons) width clear of the right/bottom inner shadow */
+.wallet-adapter-modal-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: calc(100% - 20px);
+  margin-bottom: 16px;
+}
+
+.wallet-adapter-modal-list .wallet-adapter-button {
+  color: var(--color-foreground, #000000);
+  font-family: var(--font-pp-neue-montreal-book, "PpNeueMontreal-Book", sans-serif);
+  font-weight: 500;
+  border-radius: 0.75rem;
+  margin-bottom: 0;
+  background: var(--color-card-secondary, #aea6a4);
+  transition:
+    background-color 0.15s,
+    border-color 0.15s;
+}
+
+.wallet-adapter-modal-list .wallet-adapter-button:hover {
+  background: var(--muted);
+  border-color: var(--border);
+}
+
+.wallet-adapter-modal-list .wallet-adapter-button span {
+  opacity: 1;
+}
+
+.wallet-adapter-modal-list-more {
+  color: var(--muted-foreground);
+  font-family: var(--font-pp-neue-montreal-book, "PpNeueMontreal-Book", sans-serif);
+}
+
+.wallet-adapter-modal-list-more:hover {
+  color: var(--foreground);
+}
+
+.wallet-adapter-modal-list-more svg {
+  fill: currentColor;
+}
+
+.wallet-adapter-modal-middle-button {
+  margin-top: 1rem;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-family: var(--font-parabole, "Parabole", sans-serif);
+  font-weight: 400;
+  font-size: 1rem;
+  border-radius: 9999px;
+  padding: 0.75rem 1.25rem;
+  border: none;
+  transition: opacity 0.15s;
+}
+
+.wallet-adapter-modal-middle-button:hover {
+  opacity: 0.9;
+}
