@@ -2,6 +2,7 @@
   "include": [
     "./app/**/*",
     "./prisma/**/*",
+    "./shared/**/*"
   ],
   "exclude": [],
   "compilerOptions": {

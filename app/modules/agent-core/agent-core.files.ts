@@ -8,6 +8,7 @@ import Logger from '#app/utils/logger'
 import { FileNode, FileChangeEvent } from '#app/modules/agent-core/agent-core.interface'
 
 const WORKSPACE_ROOT = process.env.WORKSPACE_ROOT || '/home/xfajarr/.openclaw/workspace/claw-cartel-projects'
+const IGNORED_DIRECTORY_NAMES = new Set(['node_modules'])
 
 const DEFAULT_PROJECT_STRUCTURE = [
   'research',
@@ -103,6 +104,10 @@ class FileSystemService {
       const nodes: FileNode[] = []
 
       for (const entry of entries) {
+        if (entry.isDirectory() && IGNORED_DIRECTORY_NAMES.has(entry.name)) {
+          continue
+        }
+
         const entryPath = path.join(dirPath, entry.name)
 
         if (entry.isDirectory()) {
@@ -143,6 +148,10 @@ class FileSystemService {
       const entries = await fs.readdir(fullPath, { withFileTypes: true })
 
       for (const entry of entries) {
+        if (entry.isDirectory() && IGNORED_DIRECTORY_NAMES.has(entry.name)) {
+          continue
+        }
+
         const entryPath = path.join(dirPath, entry.name)
 
         if (entry.isDirectory()) {
@@ -161,10 +170,18 @@ class FileSystemService {
   async createZip(runId: string): Promise<string> {
     const projectPath = path.join(WORKSPACE_ROOT, runId)
     const zipPath = path.join(WORKSPACE_ROOT, `${runId}.zip`)
+    const files = await this.getAllFiles(runId)
 
     const { default: AdmZip } = await import('adm-zip')
     const zip = new AdmZip()
-    zip.addLocalFolder(projectPath)
+
+    for (const filePath of files) {
+      const absolutePath = path.join(projectPath, filePath)
+      const zipDir = path.dirname(filePath)
+      const zipName = path.basename(filePath)
+      zip.addLocalFile(absolutePath, zipDir === '.' ? '' : zipDir, zipName)
+    }
+
     zip.writeZip(zipPath)
 
     Logger.info({ runId, zipPath }, 'Project zipped')
