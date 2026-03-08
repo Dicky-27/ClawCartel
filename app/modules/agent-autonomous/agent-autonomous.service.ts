@@ -456,8 +456,12 @@ async function processCodeGenContent(
   const newLines = (content.match(/\n/g) || []).length
   state.lineCount += newLines
 
+  const projectType = detectProjectType(state.filePath)
+
   await broadcastCodeGen(app, runId, role, 'codegen.delta', {
     filePath: state.filePath,
+    language: state.language,
+    projectType,
     chunk: content,
     lineNumber: state.lineCount,
   })

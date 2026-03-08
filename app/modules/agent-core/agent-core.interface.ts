@@ -143,6 +143,8 @@ export interface CodeGenStartedPayload {
 
 export interface CodeGenDeltaPayload {
   filePath: string
+  language: string
+  projectType: 'frontend' | 'backend' | 'smart_contract' | 'other'
   chunk: string
   lineNumber?: number
   agentId?: number
