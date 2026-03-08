@@ -11,7 +11,16 @@ import { useChat } from "@/app/_providers/ChatProvider";
 import { useSolana } from "@/app/_providers/SolanaProvider";
 import { cn, shortenAddress } from "@/app/_libs/utils";
 import { FolderIcon } from "@/app/_components/Icons";
-import { BotIcon, CheckIcon, LogOut, RotateCcw, SendIcon, WalletIcon, XIcon } from "lucide-react";
+import {
+  BotIcon,
+  CheckIcon,
+  DownloadIcon,
+  LogOut,
+  RotateCcw,
+  SendIcon,
+  WalletIcon,
+  XIcon,
+} from "lucide-react";
 import { AgentDialog } from "@/app/_components/agents/AgentDialog";
 import Image from "next/image";
 import { ChatBubble } from "./ChatBubble";
@@ -43,9 +52,12 @@ export function ChatPanel({
     phaseKey,
     hasCodegenPending,
     approvalData,
+    runId,
     startDiscussion,
     sendUserMessage,
     continueToDevelopment,
+    downloadPrd,
+    isDownloadingPrd,
     resetThread,
   } = useChat();
 
@@ -285,6 +297,22 @@ export function ChatPanel({
               <p className="text-muted-foreground font-pp-neue-montreal-book mb-4 text-xs">
                 The squad has agreed on the approach. Ready to generate code?
               </p>
+              {runId && (
+                <div className="mb-3">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="font-parabole w-full rounded-full"
+                    onClick={() => downloadPrd()}
+                    disabled={isDownloadingPrd}
+                  >
+                    <DownloadIcon
+                      className={`mr-1.5 size-3.5 ${isDownloadingPrd ? "animate-pulse" : ""}`}
+                    />
+                    {isDownloadingPrd ? "Downloading…" : "Download PRD"}
+                  </Button>
+                </div>
+              )}
               <div className="flex gap-2">
                 <Button
                   size="sm"

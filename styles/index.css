@@ -167,6 +167,12 @@
   animation: typing-cursor-blink 0.7s step-end infinite;
 }
 
+/* Root layout: use dynamic viewport height so TWA/mobile don't cut off bottom bar (Chat/Builder buttons) */
+.min-h-screen-dvh {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
 /* Mobile bottom sheet: 90% of viewport; dvh for mobile browser chrome, vh fallback */
 .mobile-sheet-height {
   height: 90vh;

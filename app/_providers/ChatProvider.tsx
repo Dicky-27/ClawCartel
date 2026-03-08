@@ -58,6 +58,8 @@ interface ChatContextType {
   continueToDevelopment: (approved: boolean) => Promise<void>;
   refreshFiles: () => Promise<void>;
   downloadProject: () => void;
+  downloadPrd: () => void;
+  isDownloadingPrd: boolean;
   resetThread: () => Promise<void>;
 }
 
@@ -81,6 +83,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const [agentBubbles, setAgentBubbles] = useState<Record<string, string>>({});
   const [codegenPendingWrites, setCodegenPendingWrites] = useState<Record<string, string>>({});
   const [deployedTxHashes, setDeployedTxHashes] = useState<DeployedContract[]>([]);
+  const [isDownloadingPrd, setIsDownloadingPrd] = useState(false);
 
   // Refs for mutable values used inside callbacks without triggering re-renders
   const runIdRef = useRef<string | null>(null);
@@ -620,6 +623,25 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     window.open(`${APP_CONFIG.api_url}/autonomous/runs/${runIdRef.current}/download`, "_blank");
   }, []);
 
+  const downloadPrd = useCallback(async () => {
+    const id = runIdRef.current;
+    if (!id || isDownloadingPrd) return;
+    setIsDownloadingPrd(true);
+    try {
+      const blob = await ChatService.getPrdDownload(id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "prd.md";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Failed to download PRD:", err);
+    } finally {
+      setIsDownloadingPrd(false);
+    }
+  }, [isDownloadingPrd]);
+
   const resetThread = useCallback(async () => {
     setError(null);
     setLoading(true);
@@ -697,6 +719,8 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       continueToDevelopment,
       refreshFiles,
       downloadProject,
+      downloadPrd,
+      isDownloadingPrd,
       resetThread,
     }),
     [
@@ -717,6 +741,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       codegenPendingWrites,
       hasCodegenPending,
       deployedTxHashes,
+      isDownloadingPrd,
       ackCodegenWrite,
       ackCodegenWrites,
       startDiscussion,
@@ -725,6 +750,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       continueToDevelopment,
       refreshFiles,
       downloadProject,
+      downloadPrd,
       resetThread,
     ],
   );

@@ -41,10 +41,10 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning className="dark h-full">
       <head />
-      <body className="h-full min-h-screen font-sans" suppressHydrationWarning>
+      <body className="h-full min-h-screen-dvh font-sans" suppressHydrationWarning>
         <Providers>
           <GlobalLoadingGate>
-            <div className="flex h-full min-h-screen flex-col">
+            <div className="flex h-full min-h-screen-dvh flex-col">
               <AppHeader />
               <main className="min-h-0 flex-1 overflow-hidden">{children}</main>
               <WalletConnectDialog />

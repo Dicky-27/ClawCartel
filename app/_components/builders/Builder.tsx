@@ -16,8 +16,9 @@ import {
 import type { WebContainerStatus } from "@/app/_libs/webcontainer/core";
 import { defaultPageContent } from "@/app/_libs/webcontainer/defaultProject";
 import { useChat } from "@/app/_providers/ChatProvider";
+import { SolanaDeployService } from "@/app/_services/solanaDeploy";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { DownloadIcon, ExternalLinkIcon, RotateCwIcon } from "lucide-react";
+import { DownloadIcon, ExternalLinkIcon, RocketIcon, RotateCwIcon } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { Button } from "../ui/button";
 import CodeTab from "./CodeTab";
@@ -51,6 +52,7 @@ export default function Builder() {
     downloadProject,
     deployedTxHashes,
     step,
+    runId,
   } = useChat();
   const [status, setStatus] = useState<WebContainerStatus>(getStatus());
   const [previewUrl, setPreviewUrl] = useState<string | null>(getPreviewUrl());
@@ -67,6 +69,11 @@ export default function Builder() {
   const [isRebuilding, setIsRebuilding] = useState(false);
   const needsReinstallRef = useRef(false);
   const pendingBuildRef = useRef(false);
+  const [isDeploying, setIsDeploying] = useState(false);
+  const [deployStatus, setDeployStatus] = useState<{
+    deploymentId: string;
+    status: string;
+  } | null>(null);
 
   const setPageCode = useCallback(
     (content: string) => {
@@ -287,6 +294,37 @@ export default function Builder() {
     }
   }, []);
 
+  const handleDeployToDevnet = useCallback(async () => {
+    if (!runId || isDeploying) return;
+    setIsDeploying(true);
+    setDeployStatus(null);
+    try {
+      const res = await SolanaDeployService.createDeployment(runId);
+      const deploymentId = res.data?.id ?? (res.data as { deploymentId?: string })?.deploymentId;
+      if (!deploymentId) {
+        setDeployStatus({
+          deploymentId: "",
+          status: "Created but no deployment ID returned",
+        });
+        return;
+      }
+      const statusRes = await SolanaDeployService.getDeploymentStatus(deploymentId);
+      const status = statusRes.data?.status ?? "Created";
+      setDeployStatus({
+        deploymentId,
+        status,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Deployment failed";
+      setDeployStatus({
+        deploymentId: "",
+        status: `Failed: ${message}`,
+      });
+    } finally {
+      setIsDeploying(false);
+    }
+  }, [runId, isDeploying]);
+
   if (typeof window !== "undefined" && !window.crossOriginIsolated) {
     return (
       <div className="flex h-full flex-col items-center justify-center p-4 text-center">
@@ -337,6 +375,26 @@ export default function Builder() {
                 <DownloadIcon className="size-3.5" />
                 Download
               </Button>
+            )}
+            {runId && deployedTxHashes.length > 0 && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="font-parabole gap-1.5 border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-400"
+                onClick={handleDeployToDevnet}
+                disabled={isDeploying}
+              >
+                <RocketIcon
+                  className={`size-3.5 ${isDeploying ? "animate-pulse" : ""}`}
+                />
+                {isDeploying ? "Creating…" : "Deploy to Devnet"}
+              </Button>
+            )}
+            {runId && deployedTxHashes.length > 0 && deployStatus && (
+              <span className="text-muted-foreground font-pp-neue-montreal-book text-xs">
+                {deployStatus.status}
+              </span>
             )}
             <Button
               type="button"

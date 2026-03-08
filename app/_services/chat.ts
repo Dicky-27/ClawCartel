@@ -51,4 +51,11 @@ export const ChatService = {
     );
     return response.data;
   },
+
+  async getPrdDownload(runId: string): Promise<Blob> {
+    const response = await baseAPI.get<Blob>(`/v1/autonomous/runs/${runId}/prd/download`, {
+      responseType: "blob",
+    });
+    return response.data;
+  },
 };
