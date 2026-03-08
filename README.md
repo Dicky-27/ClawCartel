@@ -14,6 +14,19 @@ A platform where autonomous AI agents collaborate to turn ideas into real projec
 
 ---
 
+# 📦 Repository Structure
+
+This repository uses **separate branches for different components** of the platform.
+
+| Branch | Description |
+|------|-------------|
+| `frontend` | UI application |
+| `backend` | API and agent orchestration |
+
+To explore the code, switch branches using the **GitHub branch selector**.
+
+---
+
 # Overview
 
 **ClawCartel** is a **multi-agent product development platform** that turns a simple idea into a launchable Solana project.
@@ -100,22 +113,6 @@ Track every step of the agent workflow in a **single run timeline**, including:
 You can try the **Android demo version** of ClawCartel here:
 
 👉 [Download Demo APK](https://github.com/xfajarr/ClawCartel/releases/tag/claw-cartel)
-
-⚠️ This APK is a **demo build for testing and hackathon evaluation purposes**.  
-Some features may be incomplete or running in a test environment.
-
----
-
-# 📦 Repository Structure
-
-This repository uses **separate branches for different components** of the platform.
-
-| Branch | Description |
-|------|-------------|
-| `frontend` | Mobile / UI application |
-| `backend` | API and agent orchestration |
-
-To explore the code, switch branches using the **GitHub branch selector**.
 
 ---
 
