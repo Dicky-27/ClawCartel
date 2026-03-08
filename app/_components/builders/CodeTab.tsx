@@ -19,6 +19,7 @@ const LINE_NUM = "var(--muted-foreground)";
 const CARET = "var(--foreground)";
 const EDITOR_FONT_SIZE = "0.875rem";
 const EDITOR_LINE_HEIGHT = "1.5rem";
+const EDITOR_FONT_FAMILY = "var(--font-mono), ui-monospace, monospace";
 const EDITOR_PADDING = {
   paddingTop: "0.5rem",
   paddingRight: "1rem",
@@ -131,27 +132,36 @@ export default function CodeTab({
             className="overflow-x-hidden overflow-y-auto overscroll-contain"
             style={{ minHeight: 0, flex: "1 1 0%" }}
           >
-            <div
-              className="flex w-full font-mono text-sm"
-              style={{
-                height: `${Math.max(1, lines.length) * 1.5}rem`,
-                minHeight: "100%",
-                backgroundColor: EDITOR_BG,
-              }}
-            >
+<div
+            className="flex w-full"
+            style={{
+              height: `${Math.max(1, lines.length) * 1.5}rem`,
+              minHeight: "100%",
+              backgroundColor: EDITOR_BG,
+              fontFamily: EDITOR_FONT_FAMILY,
+              fontSize: EDITOR_FONT_SIZE,
+              lineHeight: EDITOR_LINE_HEIGHT,
+            }}
+          >
               <div
                 className="shrink-0 py-2 pr-2 pl-3 text-right select-none md:pr-3 md:pl-4"
-                style={{ backgroundColor: EDITOR_BG, color: LINE_NUM }}
+                style={{
+                  backgroundColor: EDITOR_BG,
+                  color: LINE_NUM,
+                  fontFamily: EDITOR_FONT_FAMILY,
+                  fontSize: EDITOR_FONT_SIZE,
+                  lineHeight: EDITOR_LINE_HEIGHT,
+                }}
                 aria-hidden
               >
                 {lines.length > 0 ? (
                   lines.map((_, i) => (
-                    <div key={i} className="leading-6">
+                    <div key={i} style={{ lineHeight: EDITOR_LINE_HEIGHT }}>
                       {i + 1}
                     </div>
                   ))
                 ) : (
-                  <div className="leading-6">1</div>
+                  <div style={{ lineHeight: EDITOR_LINE_HEIGHT }}>1</div>
                 )}
               </div>
               <div className="relative min-w-0 flex-1 overflow-hidden">
@@ -170,15 +180,17 @@ export default function CodeTab({
                         fontSize: EDITOR_FONT_SIZE,
                         lineHeight: EDITOR_LINE_HEIGHT,
                         minHeight: "100%",
-                        fontFamily: "inherit",
+                        fontFamily: EDITOR_FONT_FAMILY,
+                        tabSize: 2,
                       }}
                       codeTagProps={{
                         style: {
-                          fontFamily: "inherit",
+                          fontFamily: EDITOR_FONT_FAMILY,
                           fontSize: EDITOR_FONT_SIZE,
                           lineHeight: EDITOR_LINE_HEIGHT,
                           margin: 0,
                           padding: 0,
+                          tabSize: 2,
                         },
                       }}
                       showLineNumbers={false}
@@ -188,7 +200,7 @@ export default function CodeTab({
                     </SyntaxHighlighter>
                   </div>
                   <textarea
-                    className="relative block w-full min-w-0 resize-none border-0 bg-transparent font-mono placeholder:text-muted-foreground focus:ring-0 focus:outline-none overflow-hidden"
+                    className="relative block w-full min-w-0 resize-none border-0 bg-transparent placeholder:text-muted-foreground focus:ring-0 focus:outline-none overflow-hidden"
                     value={code}
                     onChange={(e) => onCodeChange(e.target.value)}
                     spellCheck={false}
@@ -200,6 +212,7 @@ export default function CodeTab({
                     aria-label="Code editor"
                     style={{
                       ...EDITOR_PADDING,
+                      fontFamily: EDITOR_FONT_FAMILY,
                       fontSize: EDITOR_FONT_SIZE,
                       lineHeight: EDITOR_LINE_HEIGHT,
                       tabSize: 2,
