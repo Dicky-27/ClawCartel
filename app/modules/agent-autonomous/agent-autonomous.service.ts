@@ -161,6 +161,7 @@ const CODEGEN_START_HEADER = '===CODEGEN_START==='
 const CODEGEN_END_MARKER = '===CODEGEN_END==='
 const CODEGEN_HEADER_REGEX = /^===CODEGEN_START===\r?\nfile:\s*(.+?)\r?\nlanguage:\s*(.+?)\r?\n===\r?\n/
 const CODEGEN_MARKER_TAIL_GUARD = Math.max(CODEGEN_START_HEADER.length, CODEGEN_END_MARKER.length)
+const CODEGEN_ARTIFACT_LINE_REGEX = /^[ \t]*(===|```[a-zA-Z0-9_-]*)[ \t]*\r?\n?/gm
 
 function detectLanguage(filePath: string): string {
   const ext = filePath.split('.').pop()?.toLowerCase() || ''
@@ -212,6 +213,32 @@ function detectProjectType(filePath: string): CodegenProjectType {
   if (lower.startsWith('anchor/') || lower.includes('programs/') || lower.endsWith('.rs')) return 'smart_contract'
 
   return 'other'
+}
+
+function sanitizeGeneratedFileContent(
+  role: AgentRole,
+  filePath: string,
+  content: string
+): { content: string; strippedArtifactLines: number } {
+  if (role !== 'fe') {
+    return { content, strippedArtifactLines: 0 }
+  }
+
+  const artifactMatches = content.match(CODEGEN_ARTIFACT_LINE_REGEX)
+  if (!artifactMatches || artifactMatches.length === 0) {
+    return { content, strippedArtifactLines: 0 }
+  }
+
+  const stripped = content
+    .replace(CODEGEN_ARTIFACT_LINE_REGEX, '')
+    .replace(/^\n+/, '')
+
+  Logger.warn(
+    { role, filePath, strippedArtifactLines: artifactMatches.length },
+    'Sanitized FE codegen artifact lines from generated file content',
+  )
+
+  return { content: stripped, strippedArtifactLines: artifactMatches.length }
 }
 
 function broadcastCodeGen(
@@ -312,6 +339,10 @@ async function finalizeCodeGenState(
   state: CodeGenState
 ): Promise<void> {
   const identity = resolveAutonomousIdentity(runId, role)
+  const sanitized = sanitizeGeneratedFileContent(role, state.filePath, state.buffer)
+  state.buffer = sanitized.content
+  state.lineCount = (state.buffer.match(/\n/g) || []).length
+
   Logger.info({ runId, role, filePath: state.filePath, lines: state.lineCount }, '✅ Code generation complete')
 
   broadcastCodeGen(app, runId, role, 'codegen.done', {
@@ -518,7 +549,7 @@ async function streamAgentResponse(
 
   let fileInstructions = ''
   if (isCodeGenTask && fileWrites && fileWrites.length > 0) {
-    fileInstructions = `\n\n=== FILE GENERATION TASK ===\nYou MUST write the following files:\n${fileWrites.map(f => `- ${f.path}: ${f.description}`).join('\n')}\n\nFor each file, use the CODE GENERATION FORMAT specified in your system prompt:\n===CODEGEN_START===\nfile: [filepath]\nlanguage: [lang]\n===\n[code content]\n===CODEGEN_END===\n\nProvide complete, production-ready code.`
+    fileInstructions = `\n\n=== FILE GENERATION TASK ===\nYou MUST write the following files:\n${fileWrites.map(f => `- ${f.path}: ${f.description}`).join('\n')}\n\nFor each file, use the CODE GENERATION FORMAT specified in your system prompt:\n===CODEGEN_START===\nfile: [filepath]\nlanguage: [lang]\n===\n[code content]\n===CODEGEN_END===\n\nRules:\n- NEVER output a standalone \`===\` line inside file content.\n- NEVER wrap file content in markdown fences (no \`\`\` blocks).\n- Provide complete, production-ready code.`
   }
 
   // Inject real-time tool instructions
@@ -1116,15 +1147,19 @@ ${ctx}`,
   frontend: {
     role: 'fe' as AgentRole,
     scaffoldedFiles: [
+      // Only files that OVERRIDE the scaffold — skip vite.config, tsconfig (already exist)
       { path: 'frontend/src/App.tsx', description: 'Main App component' },
+      { path: 'frontend/src/main.tsx', description: 'React entry point' },
       { path: 'frontend/src/index.css', description: 'Global styles' },
+      { path: 'frontend/src/components/', description: 'Component files' },
     ],
     fullBootstrapFiles: [
-      { path: 'frontend/package.json', description: 'NPM scripts and dependencies' },
-      { path: 'frontend/index.html', description: 'Vite HTML entry file' },
-      { path: 'frontend/tsconfig.json', description: 'TypeScript config' },
-      { path: 'frontend/vite.config.ts', description: 'Vite configuration' },
-      { path: 'frontend/src/main.tsx', description: 'React entry point' },
+      // Generate EVERYTHING — scaffold didn't run
+      { path: 'frontend/package.json', description: 'MUST include: react, react-dom, vite, @vitejs/plugin-react, typescript' },
+      { path: 'frontend/index.html', description: 'Vite entry HTML with <div id="root">' },
+      { path: 'frontend/vite.config.ts', description: 'Vite config with react() plugin' },
+      { path: 'frontend/tsconfig.json', description: 'TS config with jsx: react-jsx' },
+      { path: 'frontend/src/main.tsx', description: 'ReactDOM.createRoot entry point' },
       { path: 'frontend/src/App.tsx', description: 'Main App component' },
       { path: 'frontend/src/index.css', description: 'Global styles' },
     ],
@@ -1136,10 +1171,12 @@ ${ctx}`,
 
 ${options?.scaffoldReady
     ? `The frontend has been scaffolded with Vite + React + TypeScript.
-Base config files already exist.`
+You MUST still output complete, production-ready frontend files so the project is runnable in WebContainer without manual fixes.`
     : 'Scaffold step failed, so you MUST generate a complete runnable frontend project from scratch (Vite + React + TypeScript).'}
 
-Your job: generate complete application code that runs with \`npm install && npm run build\`.
+Your job: generate complete application code that runs in WebContainer with:
+- \`npm install && npm run dev\`
+- \`npm run build\`
 
 Use this format for each file:
 
@@ -1152,10 +1189,15 @@ language: typescript
 
 Generate:
 ${options?.scaffoldReady
-    ? `1. frontend/src/App.tsx — main component
-2. frontend/src/index.css — styles
-3. frontend/src/components/*.tsx — components we agreed on
-4. frontend/src/hooks/*.ts — custom hooks if needed`
+    ? `1. frontend/package.json
+2. frontend/index.html
+3. frontend/tsconfig.json
+4. frontend/vite.config.ts
+5. frontend/src/main.tsx
+6. frontend/src/App.tsx
+7. frontend/src/index.css
+8. frontend/src/components/*.tsx (if needed)
+9. frontend/src/hooks/*.ts (if needed)`
     : `1. frontend/package.json
 2. frontend/index.html
 3. frontend/tsconfig.json
@@ -1166,7 +1208,9 @@ ${options?.scaffoldReady
 8. frontend/src/components/*.tsx (if needed)
 9. frontend/src/hooks/*.ts (if needed)`}
 
-After generating code, call add_dependencies() for any extra npm packages needed:
+IMPORTANT: Include ALL dependencies directly in frontend/package.json.
+Do NOT rely on add_dependencies tool — generate package.json with complete deps list upfront.
+Only call add_dependencies if you genuinely missed a package after generation.
 [TOOL_CALL]
 tool: add_dependencies
 params: { "packages": ["react-router-dom", "lucide-react"], "project": "frontend" }
@@ -1174,12 +1218,16 @@ params: { "packages": ["react-router-dom", "lucide-react"], "project": "frontend
 
 Rules:
 - Every file path MUST start with \`frontend/\`
+- DO NOT generate \`frontend/node_modules\` or lockfiles (\`package-lock.json\`, \`yarn.lock\`, \`pnpm-lock.yaml\`)
+- NEVER output standalone delimiter lines like \`===\` inside file content
+- NEVER wrap file content with markdown fences (\`\`\`)
 - NO placeholder images — use CSS/SVG for visuals
 - Design must look PREMIUM and STUNNING — use modern CSS, gradients, animations
 ${!stackDecision?.backend ? '- This is frontend-only — use localStorage/state for data persistence' : ''}
 ${stackDecision?.backend ? '- Backend API runs at http://localhost:3001 — use fetch for API calls' : ''}
 - Use TypeScript strictly — no \`any\`
 - Every component must be self-contained and complete
+- Ensure every import has a declared dependency in \`frontend/package.json\`
 
 Match what we scoped. Working code, not stubs.
 
@@ -1202,6 +1250,49 @@ Do NOT generate code and do NOT output file blocks.
 Context from our discussion:
 ${ctx}`,
   },
+}
+
+async function validateFrontendFiles(runId: string, files: string[]): Promise<{
+  valid: boolean
+  errors: string[]
+  warnings: string[]
+}> {
+  const errors: string[] = []
+  const warnings: string[] = []
+
+  // 1. Required files must exist
+  const required = [
+    'frontend/package.json',
+    'frontend/index.html',
+    'frontend/src/main.tsx',
+    'frontend/src/App.tsx',
+  ]
+  for (const f of required) {
+    if (!files.includes(f)) errors.push(`Missing required file: ${f}`)
+  }
+
+  // 2. Validate package.json structure
+  const pkgContent = await fileSystem.readFile(runId, 'frontend/package.json')
+  if (pkgContent) {
+    try {
+      const pkg = JSON.parse(pkgContent)
+      if (!pkg.scripts?.dev) errors.push('package.json missing scripts.dev')
+      if (!pkg.scripts?.build) errors.push('package.json missing scripts.build')
+      if (!pkg.dependencies?.react) errors.push('package.json missing react dependency')
+      if (!pkg.devDependencies?.vite && !pkg.dependencies?.vite) {
+        errors.push('package.json missing vite')
+      }
+    } catch {
+      errors.push('package.json is not valid JSON')
+    }
+  }
+
+  // 3. Check vite.config exists if referenced
+  if (!files.includes('frontend/vite.config.ts') && !files.includes('frontend/vite.config.js')) {
+    warnings.push('No vite.config found — WebContainer may not boot')
+  }
+
+  return { valid: errors.length === 0, errors, warnings }
 }
 
 // ── Continuous Development Trigger ────────────────────────────────

@@ -5,7 +5,7 @@
  * This replaces the hardcoded config in agent-core.config.ts.
  */
 
-import { readFile } from 'node:fs/promises'
+import { access, readdir, readFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import Logger from '#app/utils/logger'
 import type {
@@ -138,6 +138,123 @@ async function readMarkdownFile(filePath: string): Promise<string> {
   }
 }
 
+async function readMarkdownFileOptional(filePath: string): Promise<string> {
+  try {
+    return await readFile(filePath, 'utf-8')
+  } catch {
+    return ''
+  }
+}
+
+async function fileExists(filePath: string): Promise<boolean> {
+  try {
+    await access(filePath)
+
+    return true
+  } catch {
+    return false
+  }
+}
+
+function parseActiveSkillsFromManifest(markdown: string): string[] {
+  const skills: string[] = []
+  const lineRegex = /^\s*-\s*\[x\]\s*([a-zA-Z0-9_.-]+)/i
+
+  for (const line of markdown.split('\n')) {
+    const match = line.match(lineRegex)
+    if (match) {
+      skills.push(match[1])
+    }
+  }
+
+  return skills
+}
+
+async function resolveManifestSkillFiles(skillsDir: string, manifestMarkdown: string): Promise<string[]> {
+  const resolved: string[] = []
+  const activeSkills = parseActiveSkillsFromManifest(manifestMarkdown)
+
+  for (const skillName of activeSkills) {
+    const candidates = [
+      join(skillsDir, `${skillName}.md`),
+      join(skillsDir, skillName, 'SKILL.md'),
+    ]
+
+    for (const candidate of candidates) {
+      if (await fileExists(candidate)) {
+        resolved.push(candidate)
+        break
+      }
+    }
+  }
+
+  return resolved
+}
+
+async function discoverFallbackSkillFiles(skillsDir: string): Promise<string[]> {
+  const files: string[] = []
+
+  try {
+    const entries = await readdir(skillsDir, { withFileTypes: true })
+
+    for (const entry of entries) {
+      if (entry.name.startsWith('.')) continue
+
+      if (entry.isFile() && entry.name.endsWith('.md') && entry.name !== '_manifest.md') {
+        files.push(join(skillsDir, entry.name))
+        continue
+      }
+
+      if (entry.isDirectory()) {
+        const skillFile = join(skillsDir, entry.name, 'SKILL.md')
+        if (await fileExists(skillFile)) {
+          files.push(skillFile)
+        }
+      }
+    }
+  } catch {
+    return []
+  }
+
+  return files.sort((a, b) => a.localeCompare(b))
+}
+
+async function loadModularSkillsMarkdown(agentDir: string): Promise<{ markdown: string; loadedFiles: string[] }> {
+  const skillsDir = join(agentDir, 'skills')
+  if (!(await fileExists(skillsDir))) {
+    return { markdown: '', loadedFiles: [] }
+  }
+
+  const manifestPath = join(skillsDir, '_manifest.md')
+  const manifestMarkdown = await readMarkdownFileOptional(manifestPath)
+  const manifestFiles = manifestMarkdown
+    ? await resolveManifestSkillFiles(skillsDir, manifestMarkdown)
+    : []
+
+  const skillFiles = manifestFiles.length > 0 ? manifestFiles : await discoverFallbackSkillFiles(skillsDir)
+  const uniqueFiles = Array.from(new Set(skillFiles))
+  const sections: string[] = []
+  const loadedFiles: string[] = []
+
+  for (const filePath of uniqueFiles) {
+    const content = (await readMarkdownFileOptional(filePath)).trim()
+    if (!content) continue
+
+    const relativePath = filePath.slice(agentDir.length + 1).replace(/\\/g, '/')
+    loadedFiles.push(relativePath)
+    sections.push(`### ${relativePath}\n${content}`)
+  }
+
+  if (sections.length === 0) {
+    return { markdown: '', loadedFiles: [] }
+  }
+
+  return {
+    markdown: `## Modular Skills\n${sections.join('\n\n')}`,
+    loadedFiles,
+  }
+}
+
 // ─── Agent Loader Class ─────────────────────────────────────────────
 
 export class AgentLoader {
@@ -170,11 +287,16 @@ export class AgentLoader {
     // Load each agent
     for (const [agentId, meta] of Object.entries(AGENT_META)) {
       const agentDir = join(this.agentsDir, agentId)
+      const legacySkills = await readMarkdownFile(join(agentDir, 'skills.md'))
+      const modularSkills = await loadModularSkillsMarkdown(agentDir)
+      const combinedSkills = [legacySkills.trim(), modularSkills.markdown.trim()]
+        .filter(Boolean)
+        .join('\n\n---\n\n')
 
       const files: AgentFiles = {
         soul: await readMarkdownFile(join(agentDir, 'soul.md')),
         identity: await readMarkdownFile(join(agentDir, 'identity.md')),
-        skills: await readMarkdownFile(join(agentDir, 'skills.md')),
+        skills: combinedSkills,
         rules: await readMarkdownFile(join(agentDir, 'rules.md')),
         memory: await readMarkdownFile(join(agentDir, 'memory.md')),
         context: await readMarkdownFile(join(agentDir, 'context.md')),
@@ -196,7 +318,14 @@ export class AgentLoader {
       this.agentsByRole.set(meta.role, agent)
 
       Logger.info(
-        { agentId, role: meta.role, name: agent.name, tools: agent.tools.length, neverDo: agent.neverDo.length },
+        {
+          agentId,
+          role: meta.role,
+          name: agent.name,
+          tools: agent.tools.length,
+          neverDo: agent.neverDo.length,
+          modularSkillsLoaded: modularSkills.loadedFiles,
+        },
         'Loaded agent',
       )
     }
