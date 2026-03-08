@@ -1,0 +1,6 @@
+@theme inline {
+  --color-background: #111111;
+  --color-foreground: #fafafa;
+
+  --font-dmSans: "DM-Sans", sans-serif;
+}

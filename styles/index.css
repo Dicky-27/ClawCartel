@@ -1,0 +1,13 @@
+@import "tailwindcss";
+@import "./theme.css";
+@import "./font.css";
+
+@layer base {
+  html {
+    @apply text-foreground bg-background font-dmSans scroll-smooth font-normal antialiased;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
