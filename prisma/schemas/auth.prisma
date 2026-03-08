@@ -1,0 +1,10 @@
+model AuthNonce {
+  id        Int      @id @default(autoincrement())
+  address   String   @unique
+  nonce     String
+  message   String
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("auth_nonces")
+}

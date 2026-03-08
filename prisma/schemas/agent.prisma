@@ -1,0 +1,11 @@
+model Agent {
+  id          Int       @id @default(autoincrement())
+  name        String
+  role        AgentRole
+  description String
+  skills      String[]  @default([])
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@map("agents")
+}

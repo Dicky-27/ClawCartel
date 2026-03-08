@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "skills": {
+    "project-manager": {
+      "source": "404kidwiz/claude-supercode-skills",
+      "sourceType": "github",
+      "computedHash": "836203cc09374f9fec7a72c52d877c8d1c7df79580ce965921c7ec07a239c846"
+    },
+    "solana-dev": {
+      "source": "solana-foundation/solana-dev-skill",
+      "sourceType": "github",
+      "computedHash": "7682fefe5073ccf490698f7ccfc6203cf6f35c270d34fe7724004c271523b633"
+    }
+  }
+}

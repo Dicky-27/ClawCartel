@@ -1,0 +1,84 @@
+enum RunStatus {
+  created
+  planning
+  executing
+  awaiting_approval
+  completed
+  failed
+  cancelled
+}
+
+enum InputType {
+  chat
+  prd
+}
+
+model Run {
+  id         String    @id @default(uuid()) @db.Uuid
+  status     RunStatus @default(created)
+  inputType  InputType @map("input_type")
+  inputText  String    @map("input_text")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  agentRuns  AgentRun[]
+  events     AgentEvent[]
+  deployments ProgramDeployment[]
+
+  @@map("runs")
+}
+
+enum AgentRole {
+  pm
+  fe
+  be_sc
+  bd_research
+}
+
+enum AgentRunStatus {
+  queued
+  running
+  completed
+  failed
+}
+
+model AgentRun {
+  id          String         @id @default(uuid()) @db.Uuid
+  runId       String         @map("run_id") @db.Uuid
+  run         Run            @relation(fields: [runId], references: [id], onDelete: Cascade)
+  role        AgentRole
+  agentId     String         @map("agent_id")
+  sessionKey  String?        @map("session_key")
+  status      AgentRunStatus @default(queued)
+  startedAt   DateTime?      @map("started_at")
+  endedAt     DateTime?      @map("ended_at")
+
+  events      AgentEvent[]
+
+  @@map("agent_runs")
+}
+
+enum EventType {
+  agent_started  @map("agent.started")
+  agent_delta    @map("agent.delta")
+  agent_done     @map("agent.done")
+  agent_error    @map("agent.error")
+  run_done       @map("run.done")
+}
+
+model AgentEvent {
+  id          String    @id @default(uuid()) @db.Uuid
+  runId       String    @map("run_id") @db.Uuid
+  run         Run       @relation(fields: [runId], references: [id], onDelete: Cascade)
+  agentRunId  String    @map("agent_run_id") @db.Uuid
+  agentRun    AgentRun  @relation(fields: [agentRunId], references: [id], onDelete: Cascade)
+  seq         BigInt
+  eventType   EventType @map("event_type")
+  payload     Json      @db.JsonB
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@unique([runId, seq])
+  @@index([runId, seq])
+  @@index([agentRunId, createdAt])
+  @@map("agent_events")
+}

@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClawCartel - Agent Code Generator</title>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      font-family: 'Courier New', monospace;
+      background: #0a0a0f;
+      color: #00ff88;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    
+    .container { max-width: 1200px; margin: 0 auto; }
+    
+    h1 { text-align: center; margin-bottom: 10px; text-shadow: 0 0 10px #00ff88; }
+    .subtitle { text-align: center; color: #666; margin-bottom: 30px; }
+    
+    /* Input Section */
+    .setup-section {
+      background: rgba(0, 255, 136, 0.05);
+      border: 1px solid #00ff88;
+      border-radius: 8px;
+      padding: 20px;
+    }
+    
+    textarea {
+      width: 100%;
+      min-height: 100px;
+      background: #1a1a2e;
+      border: 1px solid #00ff88;
+      border-radius: 4px;
+      padding: 12px;
+      color: #00ff88;
+      font-family: inherit;
+      font-size: 14px;
+      resize: vertical;
+    }
+    
+    textarea:focus { outline: none; box-shadow: 0 0 10px rgba(0, 255, 136, 0.3); }
+    
+    button {
+      margin-top: 15px;
+      padding: 12px 30px;
+      background: #00ff88;
+      color: #0a0a0f;
+      border: none;
+      border-radius: 4px;
+      font-family: inherit;
+      font-weight: bold;
+      font-size: 16px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    button:hover { box-shadow: 0 0 20px rgba(0, 255, 136, 0.5); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    button.secondary { background: #4a9eff; margin-left: 10px; }
+    button.secondary:hover { box-shadow: 0 0 20px rgba(74, 158, 255, 0.5); }
+    button.danger { background: #ff4a4a; margin-left: 10px; }
+    button.success { background: #00cc66; margin-left: 10px; }
+    
+    /* Chat Section */
+    .chat-section { display: none; }
+    
+    .status-bar {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 15px;
+      background: rgba(0, 255, 136, 0.1);
+      border: 1px solid #00ff88;
+      border-radius: 4px;
+      margin-bottom: 20px;
+    }
+
+    .phase-indicator {
+      padding: 4px 12px;
+      background: rgba(0, 255, 136, 0.1);
+      border-radius: 4px;
+      font-size: 12px;
+      text-transform: uppercase;
+    }
+    
+    .status-connected { color: #00ff88; }
+    .status-disconnected { color: #ff0044; }
+    .status-complete { color: #ffff00; }
+    
+    /* Messages */
+    .messages { display: flex; flex-direction: column; gap: 15px; }
+    
+    .message {
+      background: rgba(0, 255, 136, 0.05);
+      border-left: 3px solid;
+      border-radius: 0 8px 8px 0;
+      padding: 15px;
+      animation: fadeIn 0.3s ease;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateX(-10px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    
+    .message.pm { border-color: #4a9eff; }
+    .message.researcher { border-color: #00ff88; }
+    .message.fe { border-color: #ff6b6b; }
+    .message.be_sc { border-color: #ffd93d; }
+    .message.round-marker {
+      background: rgba(255, 217, 61, 0.1);
+      border-left-color: #ffd93d;
+      text-align: center;
+      font-weight: bold;
+      color: #ffd93d;
+    }
+    .message.file-created {
+      background: rgba(0, 204, 102, 0.1);
+      border-left-color: #00cc66;
+      font-family: monospace;
+      font-size: 13px;
+    }
+    
+    .message-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-weight: bold; }
+    .avatar { font-size: 1.5em; }
+    .name { font-size: 1.1em; }
+    .typing { color: #666; font-style: italic; }
+    .done-badge { margin-left: auto; color: #00ff88; }
+    .message-content { line-height: 1.6; white-space: pre-wrap; }
+    .message-content p { margin-bottom: 8px; }
+    
+    /* Loading dots */
+    .loading { display: inline-flex; gap: 4px; }
+    .loading span {
+      width: 6px; height: 6px;
+      background: currentColor;
+      border-radius: 50%;
+      animation: bounce 1.4s infinite ease-in-out;
+    }
+    .loading span:nth-child(2) { animation-delay: 0.2s; }
+    .loading span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
+    
+    /* File Explorer */
+    .file-explorer {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid #00ff88;
+      border-radius: 8px;
+      padding: 20px;
+      margin-top: 20px;
+    }
+    
+    .file-explorer h3 { margin-bottom: 15px; color: #00ff88; }
+    
+    .file-tree { font-family: monospace; font-size: 14px; }
+    .file-item { padding: 4px 0; }
+    .file-item.directory { color: #4a9eff; }
+    .file-item.file { color: #ccc; }
+    .file-item::before { margin-right: 8px; }
+    .file-item.directory::before { content: '📁'; }
+    .file-item.file::before { content: '📄'; }
+    
+    .file-content {
+      background: #1a1a2e;
+      border: 1px solid #333;
+      border-radius: 4px;
+      padding: 15px;
+      margin-top: 10px;
+      max-height: 400px;
+      overflow: auto;
+      font-family: 'Fira Code', 'Courier New', monospace;
+      font-size: 13px;
+      white-space: pre;
+    }
+    
+    /* Approval Section */
+    .final-summary {
+      background: rgba(0, 255, 136, 0.15);
+      border: 1px solid #00ff88;
+      border-radius: 8px;
+      padding: 20px;
+      margin-top: 20px;
+    }
+    .final-summary h3 { margin-bottom: 15px; text-align: center; }
+    .action-buttons { display: flex; justify-content: center; gap: 15px; margin-top: 20px; }
+    .discussion-stats { display: flex; justify-content: center; gap: 30px; margin-top: 15px; font-size: 14px; color: #888; }
+    
+    /* Stats grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 15px;
+      margin-top: 20px;
+    }
+    .stat-card {
+      background: rgba(0, 255, 136, 0.05);
+      border: 1px solid #00ff88;
+      border-radius: 8px;
+      padding: 15px;
+      text-align: center;
+    }
+    .stat-card h4 { font-size: 24px; margin-bottom: 5px; }
+    .stat-card p { font-size: 12px; color: #888; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎮 CLAWCARTEL</h1>
+    <p class="subtitle">AI Agent Squad - Code Generator</p>
+    
+    <!-- Setup Section -->
+    <div class="setup-section" id="setup">
+      <h3>💡 What's your project idea?</h3>
+      <textarea id="ideaInput" placeholder="e.g., Build a Solana NFT marketplace with AI-powered pricing..."></textarea>
+      <button id="startBtn" onclick="startDiscussion()">Start Discussion</button>
+    </div>
+    
+    <!-- Chat Section -->
+    <div class="chat-section" id="chat">
+      <div class="status-bar">
+        <span id="connectionStatus" class="status-disconnected">🔴 Disconnected</span>
+        <span class="phase-indicator" id="phaseIndicator">WAITING</span>
+        <span id="runId"></span>
+      </div>
+      
+      <div class="messages" id="messages"></div>
+      
+      <!-- Approval Section -->
+      <div class="final-summary" id="approvalSection" style="display: none;">
+        <h3>🏁 Discussion Complete - Ready to Build</h3>
+        <div id="approvalContent"></div>
+        <div class="discussion-stats" id="discussionStats"></div>
+        <div class="action-buttons">
+          <button onclick="continueToDevelopment(true)" id="continueBtn">✅ Start Building</button>
+          <button onclick="continueToDevelopment(false)" class="danger">❌ Cancel</button>
+        </div>
+      </div>
+
+      <!-- File Explorer Section -->
+      <div class="file-explorer" id="fileExplorer" style="display: none;">
+        <h3>📁 Generated Files</h3>
+        <div class="stats-grid" id="statsGrid"></div>
+        <div class="file-tree" id="fileTree"></div>
+        <div class="action-buttons">
+          <button onclick="downloadProject()" class="success">⬇️ Download ZIP</button>
+          <button onclick="refreshFiles()" class="secondary">🔄 Refresh</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const BACKEND_URL = 'http://localhost:3000';
+    let socket = null;
+    let currentRunId = null;
+    let activeMessages = {};
+    let messageCount = 0;
+    let fileCount = 0;
+
+    async function startDiscussion() {
+      const idea = document.getElementById('ideaInput').value.trim();
+      if (!idea) { alert('Please enter a project idea'); return; }
+
+      const btn = document.getElementById('startBtn');
+      btn.disabled = true;
+      btn.textContent = 'Starting...';
+
+      try {
+        const res = await fetch(`${BACKEND_URL}/v1/autonomous/runs`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ idea, mode: 'squad' })
+        });
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        
+        const response = await res.json();
+        console.log('API Response:', response);
+        
+        // Handle wrapped response: { status, code, message, data: { id, ... } }
+        const run = response.data || response;
+        currentRunId = run.id;
+        
+        if (!currentRunId) {
+          console.error('Full response:', JSON.stringify(response, null, 2));
+          throw new Error('No runId in response - check console');
+        }
+
+        document.getElementById('setup').style.display = 'none';
+        document.getElementById('chat').style.display = 'block';
+        document.getElementById('runId').textContent = `Run: ${currentRunId.slice(0, 8)}...`;
+        connectWebSocket(currentRunId);
+      } catch (err) {
+        alert('Failed: ' + err.message);
+        btn.disabled = false;
+        btn.textContent = 'Start Discussion';
+      }
+    }
+
+    function connectWebSocket(runId) {
+      socket = io(BACKEND_URL, { transports: ['websocket'] });
+
+      socket.on('connect', () => {
+        document.getElementById('connectionStatus').className = 'status-connected';
+        document.getElementById('connectionStatus').textContent = '🟢 Connected';
+        socket.emit('join_run', { runId });
+      });
+
+      socket.on('disconnect', () => {
+        document.getElementById('connectionStatus').className = 'status-disconnected';
+        document.getElementById('connectionStatus').textContent = '🔴 Disconnected';
+      });
+
+      socket.on('agent_event', handleEvent);
+    }
+
+    function handleEvent(event) {
+      const { eventType, payload } = event;
+      const container = document.getElementById('messages');
+      
+      if (payload.phase) {
+        const phaseMap = {
+          'round_1': 'ROUND 1: INITIAL THOUGHTS',
+          'round_2': 'ROUND 2: DEBATE',
+          'round_3': 'ROUND 3: FINAL POSITIONS',
+          'final': 'FINAL DECISION',
+          'awaiting_approval': 'AWAITING APPROVAL',
+          'code_generation': '🔨 CODE GENERATION',
+          'phase_1_docs': 'PHASE 1/4: DOCUMENTATION',
+          'phase_2_backend': 'PHASE 2/4: BACKEND',
+          'phase_3_frontend': 'PHASE 3/4: FRONTEND',
+          'phase_4_deploy': 'PHASE 4/4: DEPLOYMENT',
+          'file_created': '📁 FILE CREATED',
+        };
+        document.getElementById('phaseIndicator').textContent = 
+          phaseMap[payload.phase] || payload.phase.toUpperCase();
+      }
+
+      const agentClass = payload.agentName?.toLowerCase().replace('_', '_') || 'pm';
+
+      switch (eventType) {
+        case 'agent.started': {
+          if (payload.phase?.startsWith('round') || payload.phase === 'final' || 
+              payload.phase?.startsWith('phase') || payload.phase === 'code_generation') {
+            const div = document.createElement('div');
+            div.className = 'message round-marker';
+            div.innerHTML = `<div class="message-content">${payload.message || payload.phase}</div>`;
+            container.appendChild(div);
+            window.scrollTo(0, document.body.scrollHeight);
+            break;
+          }
+          const div = document.createElement('div');
+          div.className = `message ${agentClass}`;
+          div.id = `msg-${payload.agentName}-${Date.now()}`;
+          div.innerHTML = `
+            <div class="message-header">
+              <span class="avatar">${payload.agentEmoji}</span>
+              <span class="name">${payload.agentName}</span>
+              <span class="typing loading"><span></span><span></span><span></span></span>
+            </div>
+            <div class="message-content"></div>
+          `;
+          container.appendChild(div);
+          activeMessages[payload.agentName] = div;
+          break;
+        }
+
+        case 'agent.delta': {
+          if (payload.phase?.startsWith('round') || payload.phase === 'final' || 
+              payload.phase === 'file_created') {
+            if (payload.phase === 'file_created') {
+              fileCount++;
+              const div = document.createElement('div');
+              div.className = 'message file-created';
+              div.innerHTML = `<div class="message-content">${payload.message}</div>`;
+              container.appendChild(div);
+              window.scrollTo(0, document.body.scrollHeight);
+            }
+            break;
+          }
+          const div = activeMessages[payload.agentName];
+          if (div) {
+            div.querySelector('.message-content').textContent = payload.accumulated || payload.message;
+            window.scrollTo(0, document.body.scrollHeight);
+          }
+          break;
+        }
+
+        case 'agent.done': {
+          if (payload.phase?.startsWith('round') || payload.phase === 'final') break;
+          const div = activeMessages[payload.agentName];
+          if (div) {
+            div.querySelector('.typing').style.display = 'none';
+            const badge = document.createElement('span');
+            badge.className = 'done-badge';
+            badge.textContent = '✓ Done';
+            div.querySelector('.message-header').appendChild(badge);
+            div.querySelector('.message-content').textContent = payload.message;
+            messageCount++;
+          }
+          delete activeMessages[payload.agentName];
+          break;
+        }
+
+        case 'run.done': {
+          if (payload.phase === 'awaiting_approval') {
+            showApprovalUI(payload);
+          } else if (payload.phase === 'completed') {
+            showFileExplorer(payload);
+          } else if (payload.phase === 'rejected') {
+            document.getElementById('connectionStatus').textContent = '❌ Cancelled';
+          }
+          break;
+        }
+      }
+    }
+
+    function showApprovalUI(payload) {
+      document.getElementById('connectionStatus').className = 'status-complete';
+      document.getElementById('connectionStatus').textContent = '🟢 Connected | ⏸️ Awaiting Approval';
+      document.getElementById('approvalSection').style.display = 'block';
+      document.getElementById('approvalContent').innerHTML = `
+        <p><strong>${payload.message}</strong></p>
+        <p style="margin-top: 10px; color: #888;">The squad has agreed on the approach. Ready to generate code?</p>
+      `;
+      document.getElementById('discussionStats').innerHTML = `
+        <span>📊 ${messageCount} messages</span>
+        <span>🔄 ${payload.discussionSummary?.length || 0} rounds</span>
+      `;
+    }
+
+    async function showFileExplorer(payload) {
+      document.getElementById('connectionStatus').className = 'status-connected';
+      document.getElementById('connectionStatus').textContent = '🟢 Connected | ✅ Complete';
+      document.getElementById('fileExplorer').style.display = 'block';
+      
+      // Show stats
+      document.getElementById('statsGrid').innerHTML = `
+        <div class="stat-card">
+          <h4>${payload.stats?.totalFiles || fileCount}</h4>
+          <p>Files Created</p>
+        </div>
+        <div class="stat-card">
+          <h4>${Math.round((payload.stats?.totalSize || 0) / 1024)} KB</h4>
+          <p>Total Size</p>
+        </div>
+        <div class="stat-card">
+          <h4>4</h4>
+          <p>Phases</p>
+        </div>
+      `;
+      
+      await refreshFiles();
+    }
+
+    async function refreshFiles() {
+      if (!currentRunId) return;
+      try {
+        const res = await fetch(`${BACKEND_URL}/v1/autonomous/runs/${currentRunId}/files`);
+        const data = await res.json();
+        renderFileTree(data.files);
+      } catch (err) {
+        console.error('Failed to load files:', err);
+      }
+    }
+
+    function renderFileTree(files, indent = 0) {
+      const container = document.getElementById('fileTree');
+      if (indent === 0) container.innerHTML = '';
+      
+      const indentStr = '&nbsp;'.repeat(indent * 2);
+      
+      for (const file of files) {
+        const div = document.createElement('div');
+        div.className = `file-item ${file.type}`;
+        div.style.paddingLeft = `${indent * 20}px`;
+        div.innerHTML = `${indentStr}${file.type === 'directory' ? '📁' : '📄'} ${file.name}${file.size ? ` (${formatBytes(file.size)})` : ''}`;
+        
+        if (file.type === 'file') {
+          div.style.cursor = 'pointer';
+          div.onclick = () => viewFile(file.path);
+        }
+        
+        container.appendChild(div);
+        
+        if (file.children) {
+          renderFileTree(file.children, indent + 1);
+        }
+      }
+    }
+
+    async function viewFile(filePath) {
+      if (!currentRunId) return;
+      try {
+        const res = await fetch(`${BACKEND_URL}/v1/autonomous/runs/${currentRunId}/files/${filePath}`);
+        const data = await res.json();
+        
+        // Show in modal or expand inline
+        const container = document.getElementById('fileTree');
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'file-content';
+        contentDiv.innerHTML = `<div style="color:#888;margin-bottom:10px;">${filePath}</div>${escapeHtml(data.content)}`;
+        container.appendChild(contentDiv);
+      } catch (err) {
+        console.error('Failed to load file:', err);
+      }
+    }
+
+    function escapeHtml(text) {
+      return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function formatBytes(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    async function continueToDevelopment(approved) {
+      if (!currentRunId) return;
+      const btn = document.getElementById('continueBtn');
+      btn.disabled = true;
+      btn.textContent = approved ? 'Starting Build...' : 'Cancelling...';
+
+      try {
+        const res = await fetch(`${BACKEND_URL}/v1/autonomous/runs/${currentRunId}/continue`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ approved })
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        document.getElementById('approvalSection').style.display = 'none';
+        
+        if (approved) {
+          const container = document.getElementById('messages');
+          const div = document.createElement('div');
+          div.className = 'message round-marker';
+          div.innerHTML = `<div class="message-content">🚀 Starting Code Generation...</div>`;
+          container.appendChild(div);
+        }
+      } catch (err) {
+        alert('Failed: ' + err.message);
+        btn.disabled = false;
+        btn.textContent = '✅ Start Building';
+      }
+    }
+
+    function downloadProject() {
+      if (!currentRunId) return;
+      window.open(`${BACKEND_URL}/v1/autonomous/runs/${currentRunId}/download`, '_blank');
+    }
+  </script>
+</body>
+</html>

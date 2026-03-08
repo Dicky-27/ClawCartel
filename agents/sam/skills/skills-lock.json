@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "skills": {
+    "solana-dev": {
+      "source": "solana-foundation/solana-dev-skill",
+      "sourceType": "github",
+      "computedHash": "7682fefe5073ccf490698f7ccfc6203cf6f35c270d34fe7724004c271523b633"
+    },
+    "solana-anchor-claude-skill": {
+      "source": "quiknode-labs/solana-anchor-claude-skill",
+      "sourceType": "github",
+      "computedHash": "4cd7d6017eb50ab6153a61114644ce6ab675135621018f0ef3af5d4c030e9c3e"
+    }
+  }
+}

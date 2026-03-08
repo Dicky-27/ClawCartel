@@ -1,0 +1,63 @@
+enum ProgramDeploymentStatus {
+  preparing
+  ready
+  submitting
+  confirmed
+  failed
+  expired
+  cancelled
+}
+
+enum ProgramDeploymentTxStatus {
+  pending
+  sent
+  confirmed
+  failed
+}
+
+model ProgramDeployment {
+  id                   String              @id @default(uuid()) @db.Uuid
+  runId                String              @map("run_id") @db.Uuid
+  userId               Int                 @map("user_id")
+  programName          String              @map("program_name")
+  programId            String              @map("program_id")
+  walletAddress        String              @map("wallet_address")
+  rpcUrl               String              @map("rpc_url")
+  loaderModel          String              @map("loader_model")
+  lastValidBlockHeight BigInt              @map("last_valid_block_height")
+  maxDataLen           Int                 @map("max_data_len")
+  binarySize           Int                 @map("binary_size")
+  chunkSize            Int                 @map("chunk_size")
+  status               ProgramDeploymentStatus @default(preparing)
+  errorCode            String?             @map("error_code")
+  errorMessage         String?             @map("error_message")
+  createdAt            DateTime            @default(now()) @map("created_at")
+  updatedAt            DateTime            @updatedAt @map("updated_at")
+
+  run                  Run                 @relation(fields: [runId], references: [id], onDelete: Cascade)
+  user                 User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  txs                  ProgramDeploymentTx[]
+
+  @@index([runId, userId, status])
+  @@map("program_deployments")
+}
+
+model ProgramDeploymentTx {
+  id           String                    @id @default(uuid()) @db.Uuid
+  deploymentId String                    @map("deployment_id") @db.Uuid
+  txIndex      Int                       @map("tx_index")
+  kind         String
+  txBase64     String                    @map("tx_base64")
+  signature    String?
+  slot         BigInt?
+  status       ProgramDeploymentTxStatus @default(pending)
+  error        String?
+  createdAt    DateTime                  @default(now()) @map("created_at")
+  updatedAt    DateTime                  @updatedAt @map("updated_at")
+
+  deployment   ProgramDeployment @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
+
+  @@unique([deploymentId, txIndex])
+  @@index([deploymentId, txIndex])
+  @@map("program_deployment_txs")
+}
