@@ -69,7 +69,6 @@ export default function Builder() {
   const [isRebuilding, setIsRebuilding] = useState(false);
   const needsReinstallRef = useRef(false);
   const pendingBuildRef = useRef(false);
-  // Dummy Solana deploy UI (replace with real API after approval)
   const [isDeploying, setIsDeploying] = useState(false);
   const [deployStatus, setDeployStatus] = useState<{
     deploymentId: string;
