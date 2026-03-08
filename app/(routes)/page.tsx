@@ -8,6 +8,7 @@ import { IdeLayout } from "@/app/_components/IdeLayout";
 import { PixelatedLoadingScreen } from "@/app/_components/ui/PixelatedLoadingScreen";
 import type { Agent } from "@/app/_data/agents";
 import { useAgents } from "@/app/_providers/AgentsProvider";
+import { BUILD_STEPPER_PHASES } from "@/app/_constant/chat";
 import { useChat } from "@/app/_providers/ChatProvider";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -27,8 +28,40 @@ export default function IdeLayoutPage() {
   const [isMobileSheetOpen, setMobileSheetOpen] = useState(false);
   const isMobileViewport = useMediaQuery(MOBILE_VIEWPORT);
   const { agents } = useAgents();
-  const { step, runId, agentBubbles } = useChat();
+  const { step, runId, agentBubbles, phaseKey, hasCodegenPending } = useChat();
   const discussionMode = step === "chat" && !!runId;
+
+  const isBuilding =
+    hasCodegenPending ||
+    (phaseKey &&
+      BUILD_STEPPER_PHASES.indexOf(phaseKey) >= BUILD_STEPPER_PHASES.indexOf("code_generation")) ||
+    step === "complete";
+  const [builderPanelOpen, setBuilderPanelOpen] = useState(false);
+  const [builderClosedWhileBuilding, setBuilderClosedWhileBuilding] = useState(false);
+  const builderPanelOpenEffective = isBuilding
+    ? !builderClosedWhileBuilding
+    : builderPanelOpen;
+  const handleBuilderOpenChange = useCallback(
+    (open: boolean) => {
+      if (open) {
+        setBuilderClosedWhileBuilding(false);
+        setBuilderPanelOpen(true);
+      } else {
+        if (isBuilding) setBuilderClosedWhileBuilding(true);
+        else setBuilderPanelOpen(false);
+      }
+    },
+    [isBuilding],
+  );
+  const wasBuildingRef = useRef(false);
+  useEffect(() => {
+    if (isBuilding && !wasBuildingRef.current) {
+      // Auto-open builder when entering build phase (sync UI with phase)
+      // eslint-disable-next-line -- intentional setState on phase transition to auto-open builder panel
+      setBuilderClosedWhileBuilding(false);
+    }
+    wasBuildingRef.current = isBuilding;
+  }, [isBuilding]);
 
   const handleAgentInteract = useCallback(
     (agentName: string) => {
@@ -58,6 +91,8 @@ export default function IdeLayoutPage() {
           defaultLeftSize={380}
           defaultRightWidth={300}
           defaultRightOpen={false}
+          rightOpen={builderPanelOpenEffective}
+          onRightOpenChange={handleBuilderOpenChange}
           onMobileSheetOpenChange={setMobileSheetOpen}
           left={
             <ChatPanel

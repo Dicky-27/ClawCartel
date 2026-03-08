@@ -6,15 +6,16 @@ import { ScrollArea } from "@/app/_components/ui/scroll-area";
 import { Textarea } from "@/app/_components/ui/textarea";
 import type { Agent } from "@/app/_data/agents";
 import { useAgents } from "@/app/_providers/AgentsProvider";
-import { PHASE_LABELS } from "@/app/_constant/chat";
+import { BUILD_STEPPER_PHASES, PHASE_LABELS } from "@/app/_constant/chat";
 import { useChat } from "@/app/_providers/ChatProvider";
 import { useSolana } from "@/app/_providers/SolanaProvider";
 import { cn, shortenAddress } from "@/app/_libs/utils";
-import { FolderIcon, FileIcon } from "@/app/_components/Icons";
+import { FolderIcon } from "@/app/_components/Icons";
 import { BotIcon, CheckIcon, LogOut, RotateCcw, SendIcon, WalletIcon, XIcon } from "lucide-react";
 import { AgentDialog } from "@/app/_components/agents/AgentDialog";
 import Image from "next/image";
 import { ChatBubble } from "./ChatBubble";
+import { Stepper } from "./Stepper";
 
 export interface ChatPanelProps {
   emptyPlaceholder?: React.ReactNode;
@@ -39,7 +40,8 @@ export function ChatPanel({
     step,
     messages,
     loading,
-    phase,
+    phaseKey,
+    hasCodegenPending,
     approvalData,
     startDiscussion,
     sendUserMessage,
@@ -87,13 +89,34 @@ export function ChatPanel({
     }
   };
 
-  const isBuilding =
-    phase === PHASE_LABELS.code_generation ||
-    phase === PHASE_LABELS.file_created ||
-    phase === PHASE_LABELS.phase_1_brief ||
-    phase === PHASE_LABELS.phase_2_codegen_parallel;
+  const isGeneratingCode =
+    hasCodegenPending ||
+    (phaseKey &&
+      BUILD_STEPPER_PHASES.indexOf(phaseKey) >= BUILD_STEPPER_PHASES.indexOf("code_generation") &&
+      step !== "complete");
+
   const showInput =
-    isWalletConnected && step !== "approval" && !isBuilding && !loading;
+    isWalletConnected && step !== "approval" && !isGeneratingCode && !loading;
+
+  const BUILD_STEPS = BUILD_STEPPER_PHASES.map((key) => ({
+    key,
+    label: PHASE_LABELS[key] ?? key.replace(/_/g, " "),
+  }));
+  const currentStepIndex = (() => {
+    if (step === "complete") return BUILD_STEPS.length - 1;
+    if (step === "approval") return BUILD_STEPS.findIndex((s) => s.key === "awaiting_approval");
+    if (phaseKey) {
+      const i = BUILD_STEPS.findIndex((s) => s.key === phaseKey);
+      if (i >= 0) return i;
+    }
+    return 0;
+  })();
+  const showStepper =
+    isWalletConnected &&
+    (BUILD_STEPPER_PHASES.includes(phaseKey ?? "") ||
+      step === "approval" ||
+      step === "complete" ||
+      hasCodegenPending);
 
   return (
     <div className={cn("flex h-full flex-col", className)}>
@@ -110,7 +133,7 @@ export function ChatPanel({
             className="text-muted-foreground hover:text-foreground mt-2 rounded p-1 disabled:opacity-50"
             aria-label="New thread"
           >
-            <RotateCcw className="size-5" />
+            <RotateCcw className="size-4.5" />
           </button>
           <button
             type="button"
@@ -124,8 +147,8 @@ export function ChatPanel({
       </div>
 
       {/* Messages */}
-      <ScrollArea className="min-h-0 flex-1">
-        <div className="flex flex-col gap-3 p-3">
+      <ScrollArea className="min-h-0 flex-1 overflow-x-hidden">
+        <div className="flex min-w-0 flex-col gap-3 p-3">
           {messages.length === 0 && emptyPlaceholder != null ? (
             <div className="text-muted-foreground flex flex-1 flex-col items-center justify-center py-8 text-center text-sm">
               {emptyPlaceholder}
@@ -143,12 +166,12 @@ export function ChatPanel({
             messages.map((m, index) => {
               if (m.type === "round-marker") {
                 return (
-                  <div key={m.id} className="flex items-center gap-2 py-1">
-                    <div className="border-border/50 flex-1 border-t" />
-                    <span className="text-muted-foreground shrink-0 font-mono text-[10px] font-medium tracking-wider uppercase">
+                  <div key={m.id} className="flex min-w-0 items-center gap-2 py-1">
+                    <div className="border-border/50 flex-1 shrink border-t" />
+                    <span className="text-muted-foreground min-w-0 flex-1 wrap-break-word text-center font-mono text-[10px] font-medium tracking-wider uppercase">
                       {m.content}
                     </span>
-                    <div className="border-border/50 flex-1 border-t" />
+                    <div className="border-border/50 flex-1 shrink border-t" />
                   </div>
                 );
               }
@@ -189,16 +212,17 @@ export function ChatPanel({
                 !isUser && m.agentName ? agents.find((a) => a.name === m.agentName) : undefined;
 
               return (
-                <ChatBubble
-                  key={m.id}
-                  name={label}
-                  date={m.createdAt ?? ""}
-                  imagePath={isUser ? "/images/img-user.png" : "/images/img-agent.png"}
-                  content={m.content}
-                  isUser={isUser}
-                  agent={resolvedAgent}
-                  onAvatarClick={resolvedAgent ? () => setAgentForDialog(resolvedAgent) : undefined}
-                />
+                <div key={m.id} className="min-w-0 wrap-break-word">
+                  <ChatBubble
+                    name={label}
+                    date={m.createdAt ?? ""}
+                    imagePath={isUser ? "/images/img-user.png" : "/images/img-agent.png"}
+                    content={m.content}
+                    isUser={isUser}
+                    agent={resolvedAgent}
+                    onAvatarClick={resolvedAgent ? () => setAgentForDialog(resolvedAgent) : undefined}
+                  />
+                </div>
               );
             })
           )}
@@ -211,17 +235,17 @@ export function ChatPanel({
             >
               <div className="font-pp-neue-montreal-book text-foreground flex items-center gap-1.5 text-sm">
                 <span
-                  className="bg-primary h-2 w-2 animate-bounce rounded-full"
+                  className="bg-text-primary h-2 w-2 animate-bounce rounded-full"
                   style={{ animationDuration: "0.6s", animationDelay: "0ms" }}
                   aria-hidden
                 />
                 <span
-                  className="bg-primary h-2 w-2 animate-bounce rounded-full"
+                  className="bg-text-primary h-2 w-2 animate-bounce rounded-full"
                   style={{ animationDuration: "0.6s", animationDelay: "150ms" }}
                   aria-hidden
                 />
                 <span
-                  className="bg-primary h-2 w-2 animate-bounce rounded-full"
+                  className="bg-text-primary h-2 w-2 animate-bounce rounded-full"
                   style={{ animationDuration: "0.6s", animationDelay: "300ms" }}
                   aria-hidden
                 />
@@ -231,6 +255,9 @@ export function ChatPanel({
           <div ref={scrollRef} />
         </div>
       </ScrollArea>
+
+      {/* Stepper: build flow steps from round_1_parallel; horizontal scroll, auto-scroll to current */}
+      {showStepper && <Stepper steps={BUILD_STEPS} currentStepIndex={currentStepIndex} />}
 
       {/* Input / Approval — same card area; hide entire card when nothing to show */}
       {(!isWalletConnected || (step === "approval" && approvalData) || showInput) && (

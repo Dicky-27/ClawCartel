@@ -60,11 +60,38 @@ export function setTerminalListener(fn: ((output: string) => void) | null) {
 }
 
 /**
+ * Ensure WebContainer is booted; if not, call init() and wait until ready/starting.
+ * Use before any operation that needs the container (rebuild, writeFile, readFile, etc.).
+ */
+export async function ensureBooted(): Promise<void> {
+  if (instance && (status === "ready" || status === "starting")) return;
+  if (status === "error") throw new Error("WebContainer failed to start.");
+
+  const bootInProgress =
+    !instance && (status === "booting" || status === "installing" || status === "starting");
+
+  if (!instance && !bootInProgress) {
+    return new Promise<void>((resolve, reject) => {
+      init(() => resolve()).catch(reject);
+    });
+  }
+
+  for (;;) {
+    const s = getStatus();
+    if (s === "ready" || s === "starting") return;
+    if (s === "error") throw new Error("WebContainer failed to start.");
+    await new Promise((r) => setTimeout(r, 150));
+  }
+}
+
+/**
  * Restart the dev server so the preview reflects the current code (no teardown, files stay as-is).
- * Use for manual "Rebuild" when the preview is stale.
+ * Resolves when the new server is ready (so the preview iframe can reload and get fresh content).
+ * Auto-inits the container if not booted yet.
  */
 export async function rebuild(): Promise<void> {
-  if (!instance || status !== "ready") {
+  await ensureBooted();
+  if (!instance || (status !== "ready" && status !== "starting")) {
     throw new Error("Container not ready. Start the environment first.");
   }
 
@@ -81,10 +108,83 @@ export async function rebuild(): Promise<void> {
   appendTerminal("\n\n--- Rebuild ---\n\n");
   terminalListener?.(terminalOutput);
 
-  const process = await instance.spawn("npm", ["run", "dev"]);
+  const process = await instance!.spawn("npm", ["run", "dev"]);
   devProcess = process;
   void pipeProcessOutput(process);
-  // server-ready will fire from the listener registered in init()
+
+  return new Promise<void>((resolve) => {
+    type ServerReadyHandler = (port: number, url: string) => void;
+    const handler: ServerReadyHandler = (_port, url) => {
+      previewUrl = url;
+      setStatus("ready");
+      const inst = instance;
+      if (inst && typeof (inst as unknown as { off?: (e: string, h: ServerReadyHandler) => void }).off === "function") {
+        (inst as unknown as { off(e: string, h: ServerReadyHandler): void }).off("server-ready", handler);
+      }
+      resolve();
+    };
+    instance!.on("server-ready", handler);
+  });
+}
+
+/**
+ * Run `npm install` then restart the dev server.
+ * Use when codegen writes a new package.json with different dependencies.
+ */
+let reinstallInProgress = false;
+export async function reinstallAndRestart(): Promise<void> {
+  await ensureBooted();
+  if (!instance) {
+    throw new Error("Container not booted. Call init() first.");
+  }
+  if (reinstallInProgress) return;
+  reinstallInProgress = true;
+
+  try {
+    // Kill current dev server
+    if (devProcess?.kill) {
+      try {
+        devProcess.kill("SIGTERM");
+      } catch {
+        // ignore
+      }
+      devProcess = null;
+    }
+
+    setStatus("installing");
+    appendTerminal("\n\n--- Installing new dependencies ---\n\n");
+
+    const installProcess = await instance.spawn("npm", ["install"]);
+    void pipeProcessOutput(installProcess);
+    const exitCode = await installProcess.exit;
+
+    if (exitCode !== 0) {
+      appendTerminal("\n⚠ npm install exited with code " + exitCode + "\n");
+    }
+
+    setStatus("starting");
+    appendTerminal("\n--- Restarting dev server ---\n\n");
+
+    const process = await instance.spawn("npm", ["run", "dev"]);
+    devProcess = process;
+    void pipeProcessOutput(process);
+
+    await new Promise<void>((resolve) => {
+      type ServerReadyHandler = (port: number, url: string) => void;
+      const handler: ServerReadyHandler = (_port, url) => {
+        previewUrl = url;
+        setStatus("ready");
+        const inst = instance;
+        if (inst && typeof (inst as unknown as { off?: (e: string, h: ServerReadyHandler) => void }).off === "function") {
+          (inst as unknown as { off(e: string, h: ServerReadyHandler): void }).off("server-ready", handler);
+        }
+        resolve();
+      };
+      instance!.on("server-ready", handler);
+    });
+  } finally {
+    reinstallInProgress = false;
+  }
 }
 
 export async function init(onServerReady: (url: string) => void): Promise<void> {
@@ -146,10 +246,19 @@ export async function init(onServerReady: (url: string) => void): Promise<void> 
 }
 
 export async function writeFile(path: string, contents: string): Promise<void> {
-  if (!instance) {
-    throw new Error("WebContainer not booted. Call init() first.");
-  }
+  await ensureBooted();
+  if (!instance) throw new Error("WebContainer not booted. Call init() first.");
   await instance.fs.writeFile(path, contents);
+}
+
+export async function removeFile(path: string): Promise<void> {
+  await ensureBooted();
+  if (!instance) return;
+  try {
+    await instance.fs.rm(path, { recursive: true, force: true });
+  } catch (err) {
+    console.error(`[WebContainer] Failed to remove ${path}:`, err);
+  }
 }
 
 /**
@@ -157,9 +266,8 @@ export async function writeFile(path: string, contents: string): Promise<void> {
  * Uses mkdir(..., { recursive: true }).
  */
 export async function ensureParentDirs(filePath: string): Promise<void> {
-  if (!instance) {
-    throw new Error("WebContainer not booted. Call init() first.");
-  }
+  await ensureBooted();
+  if (!instance) throw new Error("WebContainer not booted. Call init() first.");
   const normalized = filePath.replace(/^\/+/, "").replace(/\/+$/, "");
   const parts = normalized.split("/").filter(Boolean);
   if (parts.length <= 1) return;
@@ -170,9 +278,8 @@ export async function ensureParentDirs(filePath: string): Promise<void> {
 export type DirEntry = { name: string; isDirectory: boolean };
 
 export async function readDir(path: string): Promise<DirEntry[]> {
-  if (!instance) {
-    throw new Error("WebContainer not booted. Call init() first.");
-  }
+  await ensureBooted();
+  if (!instance) throw new Error("WebContainer not booted. Call init() first.");
   const dir = path === "" ? "." : path;
   const entries = await instance.fs.readdir(dir, { withFileTypes: true });
   return entries.map((e) => ({
@@ -182,8 +289,7 @@ export async function readDir(path: string): Promise<DirEntry[]> {
 }
 
 export async function readFile(path: string): Promise<string> {
-  if (!instance) {
-    throw new Error("WebContainer not booted. Call init() first.");
-  }
+  await ensureBooted();
+  if (!instance) throw new Error("WebContainer not booted. Call init() first.");
   return instance.fs.readFile(path, "utf-8");
 }

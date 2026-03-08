@@ -14,13 +14,14 @@ import {
   AgentMessage,
   AgentMessageType,
   ApprovalData,
+  DeployedContract,
   FileNode,
   RunStats,
   RunStep,
 } from "../_types/chat";
 import { ChatService } from "../_services/chat";
 import { useMutation } from "@tanstack/react-query";
-import { PHASE_LABELS } from "../_constant/chat";
+import { BUILD_STEPPER_PHASES, PHASE_LABELS } from "../_constant/chat";
 import { useAgents } from "./AgentsProvider";
 
 interface SocketAgentPayload {
@@ -38,17 +39,19 @@ interface ChatContextType {
   error: string | null;
   loading: boolean;
   phase: string | null;
+  phaseKey: string | null;
   runId: string | null;
   approvalData: ApprovalData | null;
   files: FileNode[];
   stats: RunStats | null;
   fileCount: number;
   messageCount: number;
-  /** Last accumulated message per agent name, for map bubble chat */
   agentBubbles: Record<string, string>;
-  /** Pending codegen writes: file path → full accumulated content (for Builder to apply) */
   codegenPendingWrites: Record<string, string>;
+  hasCodegenPending: boolean;
+  deployedTxHashes: DeployedContract[];
   ackCodegenWrite: (path: string) => void;
+  ackCodegenWrites: (paths: string[]) => void;
   startDiscussion: (idea: string) => Promise<void>;
   sendUserMessage: (content: string) => string;
   removeMessage: (id: string) => void;
@@ -68,6 +71,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [phase, setPhase] = useState<string | null>(null);
+  const [phaseKey, setPhaseKey] = useState<string | null>(null);
   const [runId, setRunId] = useState<string | null>(null);
   const [approvalData, setApprovalData] = useState<ApprovalData | null>(null);
   const [files, setFiles] = useState<FileNode[]>([]);
@@ -76,6 +80,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const [messageCount, setMessageCount] = useState(0);
   const [agentBubbles, setAgentBubbles] = useState<Record<string, string>>({});
   const [codegenPendingWrites, setCodegenPendingWrites] = useState<Record<string, string>>({});
+  const [deployedTxHashes, setDeployedTxHashes] = useState<DeployedContract[]>([]);
 
   // Refs for mutable values used inside callbacks without triggering re-renders
   const runIdRef = useRef<string | null>(null);
@@ -83,6 +88,12 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const codegenBuffersRef = useRef<Record<string, string>>({});
   const codegenDebounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const fileCreatedIdRef = useRef(0);
+  const markerIdRef = useRef(0);
+  const phaseKeyRef = useRef<string | null>(null);
+  const codegenHasSetPhaseRef = useRef(false);
+  useEffect(() => {
+    phaseKeyRef.current = phaseKey;
+  }, [phaseKey]);
 
   const mutateGetRunsId = useMutation({
     mutationFn: ChatService.getRunsId,
@@ -120,11 +131,13 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const handleEvent = useCallback(
     (event: {
       eventType: string;
-      payload: Record<string, unknown>;
+      payload?: Record<string, unknown>;
+      data?: Record<string, unknown>;
       agent?: SocketAgentPayload;
     }) => {
-      const { eventType, payload } = event;
-      const topLevelAgent = event.agent;
+      const payload = event.payload || event.data || {};
+      const { eventType } = event;
+      const topLevelAgent = event.agent || (payload.agent as SocketAgentPayload | undefined);
       const agentName =
         (topLevelAgent?.name as string | undefined) ?? (payload.agentName as string | undefined);
       const agentId = topLevelAgent?.id;
@@ -137,6 +150,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       const bubbleKey = resolvedName ?? `agent-${agentId ?? ""}`;
 
       if (payload.phase && typeof payload.phase === "string") {
+        setPhaseKey(payload.phase);
         setPhase(PHASE_LABELS[payload.phase] ?? payload.phase.toUpperCase());
       }
 
@@ -147,42 +161,68 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             phase?.startsWith("round") ||
             phase === "final" ||
             phase?.startsWith("phase") ||
-            phase === "code_generation";
+            phase === "code_generation" ||
+            phase === "scope_lock";
 
+          // If this is a new phase, show it once as a round marker (use PHASE_LABELS so wording is editable in chat.ts)
           if (isRoundMarker) {
-            setMessages((prev) => [
-              ...prev,
-              {
-                id: `marker-${Date.now()}`,
-                type: AgentMessageType.ROUND_MARKER,
-                content: (payload.message as string) || phase || "",
-                phase,
-              },
-            ]);
-          } else {
+            setMessages((prev) => {
+              // Ensure we don't duplicate markers back-to-back
+              const lastSelectedMessage = prev[prev.length - 1];
+              if (
+                lastSelectedMessage?.type === AgentMessageType.ROUND_MARKER &&
+                lastSelectedMessage.phase === phase
+              ) {
+                return prev;
+              }
+              const label = phase ? (PHASE_LABELS[phase] ?? (payload.message as string)) : (payload.message as string);
+              markerIdRef.current += 1;
+              return [
+                ...prev,
+                {
+                  id: `marker-${markerIdRef.current}`,
+                  type: AgentMessageType.ROUND_MARKER,
+                  content: label || phase || "",
+                  phase,
+                },
+              ];
+            });
+            // Do not add an agent bubble for phase-only messages (no "Alex" + "CODE GENERATION" / "BRIEF")
             setLoading(false);
-            const id = `msg-${bubbleKey}-${Date.now()}`;
-            activeMessagesRef.current[bubbleKey] = id;
-            setMessages((prev) => [
-              ...prev,
-              {
-                id,
-                type: AgentMessageType.AGENT,
-                content: "",
-                agentName: bubbleKey,
-                agentEmoji: payload.agentEmoji as string | undefined,
-                agentId,
-                agentRole,
-                isDone: false,
-                phase,
-              },
-            ]);
+            break;
           }
+
+          // Start the agent message bubble for streaming (only when we have real content, not just a phase label)
+          setLoading(false);
+          const id = `msg-${bubbleKey}-${Date.now()}`;
+          activeMessagesRef.current[bubbleKey] = id;
+          setMessages((prev) => [
+            ...prev,
+            {
+              id,
+              type: AgentMessageType.AGENT,
+              content: (payload.message as string) || "",
+              agentName: bubbleKey,
+              agentEmoji: payload.agentEmoji as string | undefined,
+              agentId,
+              agentRole,
+              isDone: false,
+              phase,
+            },
+          ]);
           break;
         }
 
         case "agent.delta": {
           const phase = payload.phase as string | undefined;
+          const isRoundMarker =
+            !!phase &&
+            phase !== "file_created" &&
+            (phase.startsWith("round") ||
+              phase === "final" ||
+              phase.startsWith("phase") ||
+              phase === "code_generation" ||
+              phase === "scope_lock");
 
           if (phase === "file_created") {
             setFileCount((c) => c + 1);
@@ -198,20 +238,64 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             break;
           }
 
-          if (phase?.startsWith("round") || phase === "final") break;
+          if (isRoundMarker && phase) {
+            setMessages((prev) => {
+              const last = prev[prev.length - 1];
+              if (last?.type === AgentMessageType.ROUND_MARKER && last.phase === phase) return prev;
+              const label = PHASE_LABELS[phase] ?? (payload.message as string);
+              markerIdRef.current += 1;
+              return [
+                ...prev,
+                {
+                  id: `marker-${markerIdRef.current}`,
+                  type: AgentMessageType.ROUND_MARKER,
+                  content: label || phase || "",
+                  phase,
+                },
+              ];
+            });
+          }
 
           const accumulated = payload.accumulated as string | undefined;
           if (typeof accumulated === "string" && bubbleKey) {
             setAgentBubbles((prev) => ({ ...prev, [bubbleKey]: accumulated }));
           }
 
-          const deltaTargetId = activeMessagesRef.current[bubbleKey];
-          if (deltaTargetId) {
+          let deltaTargetId = activeMessagesRef.current[bubbleKey];
+          const wouldBePhaseOnly =
+            isRoundMarker && (accumulated === undefined || accumulated === "");
+          if (
+            (accumulated !== undefined || (payload.message as string)) &&
+            !deltaTargetId &&
+            bubbleKey &&
+            !wouldBePhaseOnly
+          ) {
+            const id = `msg-${bubbleKey}-${Date.now()}`;
+            activeMessagesRef.current[bubbleKey] = id;
+            deltaTargetId = id;
+            setMessages((prev) => [
+              ...prev,
+              {
+                id,
+                type: AgentMessageType.AGENT,
+                content: accumulated ?? (payload.message as string) ?? "",
+                agentName: bubbleKey,
+                agentEmoji: payload.agentEmoji as string | undefined,
+                agentId,
+                agentRole,
+                isDone: false,
+                phase,
+              },
+            ]);
+          }
+          // Only update delta content if not just a random phase update without new chunks
+          if (deltaTargetId && (accumulated !== undefined || !isRoundMarker)) {
             setMessages((prev) =>
               prev.map((m) =>
                 m.id === deltaTargetId
                   ? {
                       ...m,
+                      // Avoid overriding with phase messages if accumulated is absent
                       content: accumulated ?? (payload.message as string) ?? m.content,
                     }
                   : m,
@@ -223,14 +307,12 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
         case "agent.done": {
           const phase = payload.phase as string | undefined;
-          if (phase?.startsWith("round") || phase === "final") break;
-
           const doneTargetId = activeMessagesRef.current[bubbleKey];
           if (doneTargetId) {
             setMessages((prev) =>
               prev.map((m) =>
                 m.id === doneTargetId
-                  ? { ...m, content: payload.message as string, isDone: true }
+                  ? { ...m, content: (payload.message as string) ?? m.content, isDone: true }
                   : m,
               ),
             );
@@ -238,6 +320,18 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             delete activeMessagesRef.current[bubbleKey];
           }
           setLoading(false);
+
+          if (phase === "awaiting_approval") {
+            setApprovalData({
+              message: payload.message as string,
+              discussionSummary: payload.discussionSummary as unknown[],
+            });
+            setStep(RunStep.APPROVAL);
+          } else if (phase === "rejected") {
+            setStep(RunStep.IDLE);
+            setPhaseKey(null);
+            setAgentBubbles({});
+          }
           break;
         }
 
@@ -253,11 +347,18 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
           } else if (phase === "completed") {
             setStats((payload.stats as RunStats) ?? null);
             setStep(RunStep.COMPLETE);
+            setPhaseKey("completed");
             setPhase(null);
             setAgentBubbles({});
+            codegenHasSetPhaseRef.current = false;
             refreshFilesRef.current();
           } else if (phase === "rejected") {
             setStep(RunStep.IDLE);
+            setPhaseKey(null);
+            setAgentBubbles({});
+          } else if (phase === "chat_response") {
+            setPhaseKey(null);
+            setPhase(null);
             setAgentBubbles({});
           }
           break;
@@ -275,11 +376,42 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const ackCodegenWrites = useCallback((paths: string[]) => {
+    if (paths.length === 0) return;
+    setCodegenPendingWrites((prev) => {
+      const next = { ...prev };
+      for (const path of paths) delete next[path];
+      return next;
+    });
+  }, []);
+
   const handleCodegenEvent = useCallback(
-    (raw: { eventType: string; payload: Record<string, unknown> }) => {
-      const { eventType, payload } = raw;
+    (raw: { eventType: string; payload?: Record<string, unknown>; data?: Record<string, unknown> }) => {
+      const payload = raw.payload || raw.data || {};
+      const { eventType } = raw;
+      console.log("[ChatProvider] codegen_event received", {
+        eventType,
+        payloadKeys: Object.keys(payload ?? {}),
+        hasFilePath: "filePath" in (payload ?? {}),
+        hasChunk: "chunk" in (payload ?? {}),
+      });
+      const projectType = payload.projectType as string | undefined;
+      // Only buffer frontend files for the WebContainer preview
+      const isFrontend = !projectType || projectType === "frontend";
+
+      const advancePhaseKeyIfLater = (candidate: string) => {
+        const currentIdx = BUILD_STEPPER_PHASES.indexOf(phaseKeyRef.current ?? "");
+        const candidateIdx = BUILD_STEPPER_PHASES.indexOf(candidate);
+        if (candidateIdx === -1) return;
+        if (currentIdx === -1 || candidateIdx > currentIdx) {
+          setPhaseKey(candidate);
+          setPhase(PHASE_LABELS[candidate] ?? candidate);
+        }
+      };
+
       switch (eventType) {
         case "codegen.started": {
+          if (!isFrontend) break;
           const filePath = payload.filePath as string | undefined;
           if (typeof filePath === "string") {
             const existing = codegenDebounceRef.current[filePath];
@@ -287,20 +419,33 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             delete codegenDebounceRef.current[filePath];
             codegenBuffersRef.current[filePath] = "";
           }
+          advancePhaseKeyIfLater(projectType === "frontend" ? "phase_frontend" : "code_generation");
           break;
         }
         case "codegen.delta": {
+          if (!isFrontend) break;
+          if (!codegenHasSetPhaseRef.current) {
+            codegenHasSetPhaseRef.current = true;
+            advancePhaseKeyIfLater("code_generation");
+          }
           const filePath = payload.filePath as string | undefined;
-          const chunk = payload.chunk as string | undefined;
-          if (typeof filePath !== "string" || typeof chunk !== "string") break;
+          if (typeof filePath !== "string") break;
+          // Content from chunk only (same as useWebSocket.sample.ts: current.content + incomingChunk)
+          const incomingChunk =
+            typeof payload.chunk === "string"
+              ? payload.chunk
+              : payload.chunk != null
+                ? String(payload.chunk)
+                : "";
           if (!codegenBuffersRef.current[filePath]) {
             codegenBuffersRef.current[filePath] = "";
           }
-          codegenBuffersRef.current[filePath] += chunk;
+          codegenBuffersRef.current[filePath] += incomingChunk;
           const existing = codegenDebounceRef.current[filePath];
           if (existing) clearTimeout(existing);
           codegenDebounceRef.current[filePath] = setTimeout(() => {
             delete codegenDebounceRef.current[filePath];
+            // Flush only the buffer built from chunks for this file
             const content = codegenBuffersRef.current[filePath];
             if (content !== undefined) {
               setCodegenPendingWrites((prev) => ({ ...prev, [filePath]: content }));
@@ -310,10 +455,22 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         }
         case "codegen.done": {
           const filePath = payload.filePath as string | undefined;
+
+          // Track deployed contract tx hash (from any projectType)
+          if (typeof filePath === "string") {
+            const txHash = payload.txHash as string | undefined;
+            if (typeof txHash === "string" && txHash.length > 0) {
+              setDeployedTxHashes((prev) => [...prev, { txHash, filePath }]);
+            }
+          }
+
+          // Only flush frontend files to the WebContainer
+          if (!isFrontend) break;
           if (typeof filePath === "string") {
             const existing = codegenDebounceRef.current[filePath];
             if (existing) clearTimeout(existing);
             delete codegenDebounceRef.current[filePath];
+            // Final content from buffer (built only from chunk in codegen.delta)
             const content = codegenBuffersRef.current[filePath];
             if (content !== undefined) {
               setCodegenPendingWrites((prev) => ({ ...prev, [filePath]: content }));
@@ -328,6 +485,8 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
           setError(typeof message === "string" ? message : "Code generation failed");
           break;
         }
+        default:
+          console.log("[ChatProvider] codegen_event unhandled eventType", eventType);
       }
     },
     [],
@@ -346,14 +505,19 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       });
 
       socket.on("agent_event", (raw) => {
+        const ev = raw as { eventType?: string };
+        console.log("[ChatProvider] agent_event received", { eventType: ev?.eventType ?? "unknown" });
         handleEvent(raw);
       });
 
       socket.on("codegen_event", (raw) => {
+        const ev = raw as { eventType?: string };
+        console.log("[ChatProvider] codegen_event connected, eventType:", ev?.eventType ?? "unknown");
         handleCodegenEvent(raw);
       });
 
       const joinRun = () => {
+        console.log("[ChatProvider] join_run", { runId: id, socketConnected: socket.connected });
         setIsConnected(true);
         socket.emit("join_run", { runId: id });
       };
@@ -427,14 +591,6 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       setApprovalData(null);
       if (approved) {
         setStep(RunStep.CHAT);
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: `marker-${Date.now()}`,
-            type: AgentMessageType.ROUND_MARKER,
-            content: "🚀 Starting Code Generation...",
-          },
-        ]);
       } else {
         setStep(RunStep.IDLE);
       }
@@ -467,6 +623,29 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const resetThread = useCallback(async () => {
     setError(null);
     setLoading(true);
+
+    // Clear everything immediately for a snappy UI
+    setMessages([]);
+    setStep(RunStep.IDLE);
+    setApprovalData(null);
+    setPhaseKey(null);
+    setPhase(null);
+    setAgentBubbles({});
+    setCodegenPendingWrites({});
+    setDeployedTxHashes([]);
+    setStats(null);
+    setFiles([]);
+    setFileCount(0);
+    setMessageCount(0);
+
+    // Reset refs
+    runIdRef.current = null;
+    activeMessagesRef.current = {};
+    codegenBuffersRef.current = {};
+    codegenHasSetPhaseRef.current = false;
+    fileCreatedIdRef.current = 0;
+    markerIdRef.current = 0;
+
     try {
       const response = await mutateStartNewThread.mutateAsync({
         idea: " ",
@@ -475,15 +654,6 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       if (!response.data?.id) throw new Error(response.message ?? "Failed to start new thread");
       runIdRef.current = response.data.id;
       setRunId(response.data.id);
-      setMessages([]);
-      setStep(RunStep.CHAT);
-      setApprovalData(null);
-      setPhase(null);
-      setAgentBubbles({});
-      setCodegenPendingWrites({});
-      setStats(null);
-      setFileCount(0);
-      setMessageCount(0);
       connectWebSocket(response.data.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to reset thread");
@@ -498,6 +668,8 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  const hasCodegenPending = Object.keys(codegenPendingWrites).length > 0;
+
   const value = useMemo(
     () => ({
       step,
@@ -506,6 +678,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       error,
       loading,
       phase,
+      phaseKey,
       runId,
       approvalData,
       files,
@@ -514,7 +687,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       messageCount,
       agentBubbles,
       codegenPendingWrites,
+      hasCodegenPending,
+      deployedTxHashes,
       ackCodegenWrite,
+      ackCodegenWrites,
       startDiscussion,
       sendUserMessage,
       removeMessage,
@@ -530,6 +706,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       error,
       loading,
       phase,
+      phaseKey,
       runId,
       approvalData,
       files,
@@ -538,7 +715,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       messageCount,
       agentBubbles,
       codegenPendingWrites,
+      hasCodegenPending,
+      deployedTxHashes,
       ackCodegenWrite,
+      ackCodegenWrites,
       startDiscussion,
       sendUserMessage,
       removeMessage,

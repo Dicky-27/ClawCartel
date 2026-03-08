@@ -9,6 +9,11 @@ import { useState } from "react";
 import { FileTree } from "./FileTree";
 import { TerminalCard } from "./TerminalCard";
 
+function parseAnsi(text: string) {
+  // eslint-disable-next-line no-control-regex
+  return text.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, "").replace(/\r/g, "\n");
+}
+
 const EDITOR_BG = "var(--background)";
 const LINE_NUM = "var(--muted-foreground)";
 const CARET = "var(--foreground)";
@@ -217,7 +222,7 @@ export default function CodeTab({
       </div>
 
       <div className="border-border bg-muted/20 flex h-40 shrink-0 flex-col border-t md:h-[200px]">
-        <TerminalCard output={terminalOutput} />
+        <TerminalCard output={parseAnsi(terminalOutput)} />
       </div>
     </div>
   );

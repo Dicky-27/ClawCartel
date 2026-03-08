@@ -16,7 +16,6 @@ export function TypewriterText({
   enabled?: boolean;
   speedMs?: number;
   className?: string;
-  /** Optional render prop: (visibleText, showCursor) => ReactNode. When set, used instead of default plain text + cursor. */
   children?: (visible: string, showCursor: boolean) => React.ReactNode;
 }) {
   const [visibleLength, setVisibleLength] = React.useState(0);
@@ -32,8 +31,8 @@ export function TypewriterText({
       setVisibleLength(text.length);
       return;
     }
-    // Reset if content was truncated (e.g. message replaced)
-    if (text.length < prevLenRef.current) {
+    // Only reset if the text becomes strictly smaller or empty entirely, meaning a new message arrived
+    if (text.length < prevLenRef.current && text.length === 0) {
       setVisibleLength(0);
     }
     prevLenRef.current = text.length;

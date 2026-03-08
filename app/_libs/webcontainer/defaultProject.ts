@@ -130,7 +130,7 @@ export const defaultProject: FileSystemTree = {
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
 `,
@@ -151,16 +151,41 @@ export default defineConfig({
 `,
     },
   },
+  "tsconfig.json": {
+    file: {
+      contents: `{
+  "compilerOptions": {
+    "target": "es2020",
+    "useDefineForClassFields": true,
+    "lib": ["es2020", "dom", "dom.iterable"],
+    "module": "esnext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["src"]
+}
+`,
+    },
+  },
   src: {
     directory: {
-      "main.jsx": {
+      "main.tsx": {
         file: {
           contents: `import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App.jsx';
+import App from './App.tsx';
 import './index.css';
 
-ReactDOM.createRoot(document.getElementById('root')).render(
+ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
     <App />
   </React.StrictMode>
@@ -168,7 +193,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 `,
         },
       },
-      "App.jsx": {
+      "App.tsx": {
         file: {
           contents: DEFAULT_APP_CONTENT,
         },

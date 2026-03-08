@@ -77,24 +77,41 @@ export interface AutonomusFilesProjectResponse {
   };
 }
 
+export type CodegenProjectType = "frontend" | "backend" | "smart_contract";
+
 export type CodegenEventType = "codegen.started" | "codegen.delta" | "codegen.done" | "codegen.error";
+
+export interface CodegenStartedPayload {
+  filePath?: string;
+  language?: string;
+  projectType?: CodegenProjectType;
+  timestamp?: string;
+}
 
 export interface CodegenDeltaPayload {
   filePath: string;
   chunk: string;
+  language?: string;
+  projectType?: CodegenProjectType;
   lineNumber?: number;
   timestamp?: string;
 }
 
-export interface CodegenStartedPayload {
-  filePath?: string;
-}
-
 export interface CodegenDonePayload {
   filePath: string;
+  language?: string;
+  totalLines?: number;
+  totalChars?: number;
+  timestamp?: string;
+  txHash?: string;
 }
 
 export interface CodegenErrorPayload {
   message?: string;
   error?: string;
+}
+
+export interface DeployedContract {
+  txHash: string;
+  filePath: string;
 }

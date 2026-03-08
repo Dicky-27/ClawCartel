@@ -32,6 +32,9 @@ export interface IdeLayoutProps {
   defaultLeftSize?: number;
   defaultRightWidth?: number;
   defaultRightOpen?: boolean;
+  /** When set, right panel open state is controlled (e.g. auto-open when building). */
+  rightOpen?: boolean;
+  onRightOpenChange?: (open: boolean) => void;
   onMobileSheetOpenChange?: (open: boolean) => void;
   className?: string;
   leftClassName?: string;
@@ -46,6 +49,8 @@ export function IdeLayout({
   defaultLeftSize = DEFAULT_LEFT_WIDTH,
   defaultRightWidth = DEFAULT_RIGHT_WIDTH,
   defaultRightOpen = true,
+  rightOpen: controlledRightOpen,
+  onRightOpenChange,
   onMobileSheetOpenChange,
   className,
   leftClassName,
@@ -67,6 +72,19 @@ export function IdeLayout({
   );
   const [leftWidth, setLeftWidth] = React.useState(defaultLeftSize);
   const [rightWidth, setRightWidth] = React.useState(defaultRightOpen ? defaultRightWidth : 0);
+
+  const isRightControlled = controlledRightOpen !== undefined;
+  const rightPanelOpen = isRightControlled ? controlledRightOpen : rightWidth > 0;
+  const displayRightWidth = rightPanelOpen ? (rightWidth || defaultRightWidth) : 0;
+
+  React.useEffect(() => {
+    if (!isRightControlled) return;
+    if (controlledRightOpen) {
+      setRightWidth((w) => (w > 0 ? w : defaultRightWidth));
+    } else {
+      setRightWidth(0);
+    }
+  }, [isRightControlled, controlledRightOpen, defaultRightWidth]);
   const leftDragRef = React.useRef(false);
   const rightDragRef = React.useRef(false);
   const leftStartRef = React.useRef({ x: 0, w: 0 });
@@ -85,9 +103,9 @@ export function IdeLayout({
     (e: React.MouseEvent) => {
       e.preventDefault();
       rightDragRef.current = true;
-      rightStartRef.current = { x: e.clientX, w: rightWidth };
+      rightStartRef.current = { x: e.clientX, w: displayRightWidth };
     },
-    [rightWidth],
+    [displayRightWidth],
   );
 
   React.useEffect(() => {
@@ -251,14 +269,14 @@ export function IdeLayout({
             ))}
 
           {hasRight &&
-            (rightWidth > 0 ? (
+            (displayRightWidth > 0 ? (
               <>
                 <div
                   role="separator"
                   aria-orientation="vertical"
                   onMouseDown={handleRightDragStart}
                   className="hover:bg-background-secondary active:bg-background-secondary absolute top-0 bottom-0 z-20 my-5 mr-2 w-1 cursor-col-resize rounded-full"
-                  style={{ right: rightWidth }}
+                  style={{ right: displayRightWidth }}
                   aria-label="Resize right panel"
                 />
                 <div
@@ -266,11 +284,11 @@ export function IdeLayout({
                     "bg-card border-border absolute top-0 right-0 bottom-0 z-10 m-2 flex flex-col overflow-hidden rounded-xl border shadow-sm",
                     rightClassName,
                   )}
-                  style={{ width: rightWidth }}
+                  style={{ width: displayRightWidth }}
                 >
                   <button
                     type="button"
-                    onClick={() => setRightWidth(0)}
+                    onClick={() => (isRightControlled ? onRightOpenChange?.(false) : setRightWidth(0))}
                     className="text-foreground hover:bg-muted hover:text-primary absolute top-2 right-2 z-10 rounded p-1.5"
                     aria-label="Hide right panel"
                   >
@@ -284,7 +302,7 @@ export function IdeLayout({
             ) : (
               <button
                 type="button"
-                onClick={() => setRightWidth(defaultRightWidth)}
+                onClick={() => (isRightControlled ? onRightOpenChange?.(true) : setRightWidth(defaultRightWidth))}
                 className="border-border bg-background/50 hover:bg-muted text-muted-foreground hover:text-foreground absolute top-0 right-0 z-10 my-2 mr-2 flex h-[calc(100%-1rem)] w-6 flex-col items-center justify-center gap-1 rounded-full border border-r-0 transition-colors"
                 aria-label="Show right panel"
               >

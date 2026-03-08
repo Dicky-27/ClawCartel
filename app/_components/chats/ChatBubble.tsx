@@ -62,11 +62,11 @@ export function ChatBubble({
         <p className="font-pp-neue-montreal-book text-muted-foreground text-lg">{date}</p>
       </div>
 
-      <div className={cn("ml-1", isUser && "text-right")}>
+      <div className={cn("ml-1 min-w-0 max-w-full", isUser && "text-right")}>
         <h1 className="font-pp-neue-montreal-bold mt-1 text-lg" style={{ color: agentColor }}>
           {name}
         </h1>
-        <div className="font-pp-neue-montreal-book text-foreground text-sm">
+        <div className="font-pp-neue-montreal-book text-foreground min-w-0 wrap-break-word text-sm">
           <CollapsibleMessage contentLength={safeContent.length}>
             {messageBody}
           </CollapsibleMessage>

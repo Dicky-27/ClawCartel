@@ -14,10 +14,21 @@ type PreviewTabProps = {
   status: WebContainerStatus;
   previewUrl: string | null;
   error: string | null;
+  hasCodegenPending?: boolean;
+  previewReloadKey?: number;
 };
 
-function PreviewLoading({ status }: { status: WebContainerStatus }) {
-  const label = (status && STATUS_LABELS[status]) ?? "Loading…";
+function PreviewLoading({
+  status,
+  hasCodegenPending,
+}: {
+  status: WebContainerStatus;
+  hasCodegenPending?: boolean;
+}) {
+  const label =
+    hasCodegenPending && status !== "ready"
+      ? "Waiting for environment…"
+      : (status && STATUS_LABELS[status]) ?? "Loading…";
   return (
     <div className="flex h-full min-h-[200px] flex-col items-center justify-center gap-6 p-6">
       {/* Fake browser window */}
@@ -62,7 +73,13 @@ function PreviewLoading({ status }: { status: WebContainerStatus }) {
   );
 }
 
-export default function PreviewTab({ status, previewUrl, error }: PreviewTabProps) {
+export default function PreviewTab({
+  status,
+  previewUrl,
+  error,
+  hasCodegenPending = false,
+  previewReloadKey = 0,
+}: PreviewTabProps) {
   if (error) {
     return (
       <div className="flex h-full min-h-[200px] items-center justify-center p-6">
@@ -72,16 +89,25 @@ export default function PreviewTab({ status, previewUrl, error }: PreviewTabProp
   }
 
   if (status !== "ready" || !previewUrl) {
-    return <PreviewLoading status={status ?? "idle"} />;
+    return (
+      <PreviewLoading status={status ?? "idle"} hasCodegenPending={hasCodegenPending} />
+    );
   }
+
+  const iframeSrc =
+    previewUrl != null
+      ? `${previewUrl}${previewUrl.includes("?") ? "&" : "?"}_=${previewReloadKey}`
+      : undefined;
 
   return (
     <div className="h-full min-h-[200px] w-full overflow-hidden">
       <iframe
+        key={previewReloadKey}
         title="Preview"
-        src={previewUrl}
+        src={iframeSrc}
         className="h-full w-full border-0"
         sandbox="allow-scripts allow-same-origin"
+        referrerPolicy="no-referrer"
       />
     </div>
   );
