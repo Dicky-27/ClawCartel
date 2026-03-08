@@ -14,7 +14,7 @@ A platform where autonomous AI agents collaborate to turn ideas into real projec
 
 ---
 
-# 🚀 Overview
+# Overview
 
 **ClawCartel** is a **multi-agent product development platform** that turns a simple idea into a launchable Solana project.
 
@@ -26,7 +26,7 @@ The entire process is visualized in a **single execution timeline**, allowing us
 
 ---
 
-# ✨ Features
+# Features
 
 ### 🧠 Multi-Agent Collaboration
 Multiple AI agents collaborate to analyze ideas, plan architecture, and coordinate development tasks.
@@ -56,7 +56,7 @@ Track every step of the agent workflow in a **single run timeline**, including:
 
 ---
 
-# 🔁 How It Works
+# How It Works
 
 1. **Create a project**
 
@@ -119,7 +119,7 @@ To explore the code, switch branches using the **GitHub branch selector**.
 
 ---
 
-# 🧠 Architecture
+# Architecture
 
 ClawCartel is built around a **multi-agent orchestration system** where agents collaborate to design and execute product development workflows.
 
