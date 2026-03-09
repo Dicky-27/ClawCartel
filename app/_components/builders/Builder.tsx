@@ -70,6 +70,7 @@ export default function Builder() {
   const [isRebuilding, setIsRebuilding] = useState(false);
   const needsReinstallRef = useRef(false);
   const pendingBuildRef = useRef(false);
+  const fileCacheRef = useRef<Record<string, string>>({});
   const [isDeploying, setIsDeploying] = useState(false);
   const [deployStatus, setDeployStatus] = useState<{
     deploymentId: string;
@@ -85,6 +86,9 @@ export default function Builder() {
         if (!currentFilePath) return;
         try {
           await writeFile(currentFilePath, content);
+          if (fileCacheRef.current[currentFilePath] !== undefined) {
+            fileCacheRef.current[currentFilePath] = content;
+          }
           setError(null);
         } catch (err) {
           console.error("[Builder] writeFile failed:", err);
@@ -218,6 +222,7 @@ export default function Builder() {
           try {
             await ensureParentDirs(localPath);
             await writeFile(localPath, content);
+            fileCacheRef.current[localPath] = content;
 
             const isCurrentFile = localPath === currentFilePath;
             const shouldSwitchToCodegen =
@@ -281,6 +286,7 @@ export default function Builder() {
       }
     } else if (step === "idle") {
        clearedDefaultsRef.current = false;
+       fileCacheRef.current = {};
     }
   }, [step, status]);
 
@@ -288,6 +294,15 @@ export default function Builder() {
     setIsRebuilding(true);
     setError(null);
     try {
+      const cache = fileCacheRef.current;
+      const cachedPaths = Object.keys(cache);
+      if (cachedPaths.length > 0) {
+        try { await removeFile("src"); } catch { /* may not exist */ }
+        for (const filePath of cachedPaths) {
+          await ensureParentDirs(filePath);
+          await writeFile(filePath, cache[filePath]);
+        }
+      }
       needsReinstallRef.current = false;
       await reinstallAndRestart();
       setStatus(getStatus());
