@@ -20,7 +20,7 @@ This repository uses **separate branches for different components** of the platf
 
 | Branch | Description |
 |------|-------------|
-| `frontend` | UI application | https://github.com/Dicky-27/ClawCartel/tree/frontend
+| `frontend` | (UI application)[https://github.com/Dicky-27/ClawCartel/tree/frontend] |
 | `backend` | API and agent orchestration | https://github.com/Dicky-27/ClawCartel/tree/backend
 
 To explore the code, switch branches using the **GitHub branch selector**.
