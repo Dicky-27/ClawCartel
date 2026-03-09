@@ -29,6 +29,13 @@ const DEFAULT_OPEN_FILES = ["src/App.tsx", "src/App.jsx", "src/main.tsx", "src/m
 const WRITE_DEBOUNCE_MS = 500;
 const CONFIG_FILES = ["package.json", "vite.config.js", "vite.config.ts", "index.html"];
 
+// Module-level state that must survive Builder unmount/remount (mobile sheet open/close).
+// If these lived in useRef, closing the preview sheet destroys Builder and resets them,
+// causing removeFile("src") to re-run and wipe all codegen files.
+let moduleFileCache: Record<string, string> = {};
+let moduleClearedDefaults = false;
+let moduleRemoveSrcPromise: Promise<void> | null = null;
+
 /**
  * Map backend path to WebContainer project path.
  * - If path contains "frontend/", use the part after it (e.g. frontend/src/App.jsx → src/App.jsx).
@@ -66,12 +73,9 @@ export default function Builder() {
   const [treeRefreshTrigger, setTreeRefreshTrigger] = useState(0);
   const [previewReloadKey, setPreviewReloadKey] = useState(0);
   const switchedToCodegenRef = useRef(false);
-  const clearedDefaultsRef = useRef(false);
   const [isRebuilding, setIsRebuilding] = useState(false);
   const needsReinstallRef = useRef(false);
   const pendingBuildRef = useRef(false);
-  const fileCacheRef = useRef<Record<string, string>>({});
-  const removeSrcPromiseRef = useRef<Promise<void> | null>(null);
   const [isDeploying, setIsDeploying] = useState(false);
   const [deployStatus, setDeployStatus] = useState<{
     deploymentId: string;
@@ -87,8 +91,8 @@ export default function Builder() {
         if (!currentFilePath) return;
         try {
           await writeFile(currentFilePath, content);
-          if (fileCacheRef.current[currentFilePath] !== undefined) {
-            fileCacheRef.current[currentFilePath] = content;
+          if (moduleFileCache[currentFilePath] !== undefined) {
+            moduleFileCache[currentFilePath] = content;
           }
           setError(null);
         } catch (err) {
@@ -191,13 +195,13 @@ export default function Builder() {
       // Wipe default src/ before laying down new files to avoid leftover App.jsx/App.tsx conflicts.
       // Stored in a shared ref so concurrent effect runs wait for any in-flight removal
       // before writing — prevents a late-completing rm from deleting newly written files.
-      if (!clearedDefaultsRef.current) {
-        clearedDefaultsRef.current = true;
-        removeSrcPromiseRef.current = removeFile("src").catch(() => {});
+      if (!moduleClearedDefaults) {
+        moduleClearedDefaults = true;
+        moduleRemoveSrcPromise = removeFile("src").catch(() => {});
       }
-      if (removeSrcPromiseRef.current) {
-        await removeSrcPromiseRef.current;
-        removeSrcPromiseRef.current = null;
+      if (moduleRemoveSrcPromise) {
+        await moduleRemoveSrcPromise;
+        moduleRemoveSrcPromise = null;
       }
 
       if (cancelled) return;
@@ -224,7 +228,7 @@ export default function Builder() {
           try {
             await ensureParentDirs(localPath);
             await writeFile(localPath, content);
-            fileCacheRef.current[localPath] = content;
+            moduleFileCache[localPath] = content;
 
             const isCurrentFile = localPath === currentFilePath;
             const shouldSwitchToCodegen =
@@ -287,8 +291,8 @@ export default function Builder() {
           });
       }
     } else if (step === "idle") {
-       clearedDefaultsRef.current = false;
-       fileCacheRef.current = {};
+       moduleClearedDefaults = false;
+       moduleFileCache = {};
     }
   }, [step, status]);
 
@@ -296,13 +300,12 @@ export default function Builder() {
     setIsRebuilding(true);
     setError(null);
     try {
-      const cache = fileCacheRef.current;
-      const cachedPaths = Object.keys(cache);
+      const cachedPaths = Object.keys(moduleFileCache);
       if (cachedPaths.length > 0) {
         try { await removeFile("src"); } catch { /* may not exist */ }
         for (const filePath of cachedPaths) {
           await ensureParentDirs(filePath);
-          await writeFile(filePath, cache[filePath]);
+          await writeFile(filePath, moduleFileCache[filePath]);
         }
       }
       needsReinstallRef.current = false;

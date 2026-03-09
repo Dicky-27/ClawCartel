@@ -205,15 +205,16 @@ export function IdeLayout({
               showCloseButton={true}
               className="border-border bg-card flex flex-col gap-0 p-0 [box-shadow:6px_6px_0px_0px_#827B79_inset] data-[side=bottom]:border-t"
             >
-              <div
-                className={cn(
-                  "min-h-0 flex-1 overflow-auto",
-                  mobileSheet === "chat" ? leftClassName : rightClassName,
-                )}
-              >
-                {mobileSheet === "chat" && hasLeft && left}
-                {mobileSheet === "preview" && hasRight && right}
-              </div>
+              {hasLeft && (
+                <div className={cn("min-h-0 flex-1 overflow-auto", leftClassName, mobileSheet !== "chat" && "hidden")}>
+                  {left}
+                </div>
+              )}
+              {hasRight && (
+                <div className={cn("min-h-0 flex-1 overflow-auto", rightClassName, mobileSheet !== "preview" && "hidden")}>
+                  {right}
+                </div>
+              )}
             </SheetContent>
           </Sheet>
         </div>
